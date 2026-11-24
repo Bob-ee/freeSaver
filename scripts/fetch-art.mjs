@@ -88,12 +88,13 @@ writeFileSync(thumbFile, JSON.stringify(thumbs));
 const thumbOf = (w) => w.thumb || thumbs[w.src[0]] || w.src[w.src.length - 1];
 
 async function measure(url) {
-  let bytes;
-  try {
-    const res = await fetch(url, { headers: { 'User-Agent': UA }, referrerPolicy: 'no-referrer' });
-    if (!res.ok || !(res.headers.get('content-type') || '').startsWith('image/')) return null;
-    bytes = Buffer.from(await res.arrayBuffer());
-  } catch { return null; }
+  // Downloaded with curl over HTTP/2: some image servers (Wikimedia) refuse
+  // HTTP/1.1 clients such as Node's fetch, and others refuse ffmpeg's own.
+  const bytes = await new Promise((resolve) => {
+    execFile('curl', ['-sfL', '--http2', '-m', '40', '-A', UA, url],
+      { encoding: 'buffer', maxBuffer: 40 << 20 }, (err, out) => resolve(err || !out || !out.length ? null : out));
+  });
+  if (!bytes) return null;
   return new Promise((resolve) => {
     const child = execFile('ffmpeg', ['-loglevel', 'error', '-i', 'pipe:0', '-frames:v', '1',
       '-vf', 'scale=32:32', '-f', 'rawvideo', '-pix_fmt', 'rgb24', '-'],

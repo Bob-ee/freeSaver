@@ -19,6 +19,7 @@ No subscription, no account, no ads.
 | National Gallery of Art | Paintings, drawings, photographs | CC0 |
 | The Metropolitan Museum of Art | Paintings, prints, photographs | CC0 |
 | NASA | Deep sky, planets, Earth from orbit | Public domain (NASA media policy) |
+| Wikimedia Commons | Modern art; contemporary photography (featured pictures) | Public domain, CC0, CC BY and CC BY-SA. Photographers are credited on screen |
 | Generative | Abstract pictures drawn on the TV, new every time | Made on your device |
 | Your photos | Sent from your phone, or a shared album | Yours |
 
@@ -128,8 +129,9 @@ npm run art:refresh            # every source
 npm run art:refresh -- nasa    # just one
 ```
 
-Each source is a small module in `scripts/sources/`. The Met's API is rate
-limited, so that one takes about ten minutes.
+Each source is a small module in `scripts/sources/`. The Met and Wikimedia
+are rate limited, so those take ten to fifteen minutes each; run them one at
+a time and do not repeat them back to back.
 
 ## Preview in a browser
 
@@ -151,6 +153,8 @@ applies.
 
 ## Licence
 
-MIT. See [LICENSE](LICENSE). The artworks belong to the public domain or to
-their respective institutions and photographers as noted above; this project
-only links to them.
+MIT for the code. See [LICENSE](LICENSE). The pictures are not part of this
+project: they belong to the public domain or to their institutions and
+photographers under the licences above, and the app only links to them.
+Creative Commons photographs are shown with the photographer's name and
+licence.

@@ -278,6 +278,9 @@
             ar: w.ar,
             v: w.v,
             tier: w.t || 1,
+            // Creative Commons works must be credited, so their caption is
+            // always shown for a moment, whatever the Titles setting.
+            credit: /\bCC BY/.test(w.sub || ''),
             mature: !!w.m,
             urls: w.src,
             title: w.title || '',
@@ -398,7 +401,7 @@
     say('');
 
     if (captionMode() === 'always') showCaption(item, true);
-    else if (captionMode() === 'onChange' || announce) showCaption(item, false);
+    else if (captionMode() === 'onChange' || announce || item.credit) showCaption(item, false);
     else $('caption').classList.remove('visible');
   }
 

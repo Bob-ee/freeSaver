@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """Builds numbered contact sheets of the whole catalogue for reviewing by eye.
 
-    python3 scripts/contact-sheets.py
+    python3 scripts/contact-sheets.py            # everything
+    python3 scripts/contact-sheets.py commons    # one source only
 
 Needs Pillow. Reads app/art.json and scripts/.cache/thumbs.json (written by
 `npm run art:refresh`), downloads each thumbnail once, and writes
@@ -14,6 +15,7 @@ import json
 import os
 import subprocess
 import sys
+import time
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image, ImageDraw, ImageFont
@@ -24,6 +26,7 @@ CACHE = os.path.join(HERE, '.cache')
 THUMBS = os.path.join(CACHE, 'thumb-images')
 SHEETS = os.path.join(CACHE, 'sheets')
 COLS, ROWS, CELL_W, CELL_H, PAD = 6, 5, 400, 225, 6
+PAUSE = 0  # seconds to wait after each download
 UA = ('Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 '
       '(KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36')
 
@@ -33,10 +36,12 @@ def fetch(job):
     path = os.path.join(THUMBS, '%05d.jpg' % number)
     if os.path.exists(path):
         return
+    time.sleep(PAUSE)
     try:
         # curl rather than urllib: python.org builds of Python often have no
         # certificate bundle configured, and curl uses the system's.
-        data = subprocess.run(['curl', '-sfL', '-m', '40', '-A', UA, url], capture_output=True, check=True).stdout
+        data = subprocess.run(['curl', '-sfL', '--http2', '--retry', '3', '--retry-delay', '5', '-m', '60', '-A', UA, url],
+                              capture_output=True, check=True).stdout
         im = Image.open(io.BytesIO(data)).convert('RGB')
         # Crop to 16:9 from the centre, as the app does.
         w, h = im.size
@@ -55,15 +60,25 @@ def main():
     art = json.load(open(os.path.join(ROOT, 'app', 'art.json')))
     thumbs = json.load(open(os.path.join(CACHE, 'thumbs.json')))
     works = art['works']
+    if len(sys.argv) > 1:
+        works = [w for w in works if w['source'] == sys.argv[1]]
+    global PAUSE
+    gentle = len(sys.argv) > 1 and sys.argv[1] == 'commons'  # Wikimedia resets bursts of requests
+    workers = 1 if gentle else 8
+    PAUSE = 0.8 if gentle else 0
     os.makedirs(THUMBS, exist_ok=True)
     os.makedirs(SHEETS, exist_ok=True)
     for old in os.listdir(SHEETS):
         os.remove(os.path.join(SHEETS, old))
-    for old in os.listdir(THUMBS):
-        os.remove(os.path.join(THUMBS, old))  # numbering changes whenever the catalogue does
+    stamp = os.path.join(THUMBS, '.selection')
+    selection = ' '.join(sys.argv[1:]) + ':' + str(len(works)) + ':' + (works[0]['src'][0] if works else '')
+    if not os.path.exists(stamp) or open(stamp).read() != selection:
+        for old in os.listdir(THUMBS):
+            os.remove(os.path.join(THUMBS, old))  # numbering changes whenever the selection does
+        open(stamp, 'w').write(selection)
 
     jobs = [(i, thumbs.get(w['src'][0]) or w['src'][-1]) for i, w in enumerate(works)]
-    with ThreadPoolExecutor(max_workers=8) as pool:
+    with ThreadPoolExecutor(max_workers=workers) as pool:
         list(pool.map(fetch, jobs))
 
     try:
