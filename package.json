@@ -1,0 +1,21 @@
+{
+  "name": "freesaver",
+  "version": "1.0.0",
+  "description": "Free art and photo frame for LG webOS TVs",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "tv:setup": "sh scripts/setup-tv.sh",
+    "deploy": "npm run build && ares-install --device tv build/*.ipk && ares-launch --device tv com.freesaver.app",
+    "launch": "ares-launch --device tv com.freesaver.app",
+    "inspect": "ares-inspect --device tv --app com.freesaver.app --open",
+    "art:refresh": "node scripts/fetch-art.mjs"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "MIT",
+  "type": "commonjs",
+  "devDependencies": {
+    "@webos-tools/cli": "^3.2.6"
+  },
+  "private": true
+}

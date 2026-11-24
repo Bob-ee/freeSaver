@@ -1,0 +1,8 @@
+node_modules/
+build/
+scripts/.cache/
+.DS_Store
+
+# Your own pictures stay on your machine.
+photos/*
+!photos/.gitkeep

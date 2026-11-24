@@ -1,0 +1,14 @@
+{
+  "id": "com.freesaver.app",
+  "version": "1.0.0",
+  "vendor": "freeSaver",
+  "type": "web",
+  "main": "index.html",
+  "title": "freeSaver",
+  "icon": "icon.png",
+  "largeIcon": "largeIcon.png",
+  "bgColor": "#000000",
+  "iconColor": "#1b1b1b",
+  "disableBackHistoryAPI": true,
+  "requiredACG": []
+}
