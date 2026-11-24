@@ -38,6 +38,7 @@ scored for brightness and colour so murky ones are left out.
 - Save favourites and play only those; thumbs-down a picture so it never
   comes back.
 - Keeps working without internet by drawing generative art.
+- Renews its own Developer Mode session, so it stays installed.
 - Nothing to run on a computer once it is installed.
 
 ## Remote control
@@ -71,16 +72,14 @@ and bundling your own photos uses macOS `sips`.
 
 `npm run deploy` builds the app, installs it and launches it.
 
-### Developer Mode expires
+### Developer Mode and staying installed
 
-This is LG's rule for any sideloaded app, not something freeSaver can change:
-the TV removes sideloaded apps when the Developer Mode session runs out
-(1,000 hours on current TVs). Open the Developer Mode app on the TV and press
-**Extend** now and then to reset the clock.
-
-If you keep a computer around anyway, `npm run devmode:extend` does the same
-thing from there, and `npm run devmode:schedule` (macOS) repeats it daily.
-Both are optional conveniences.
+LG removes sideloaded apps when the TV's Developer Mode session runs out
+(1,000 hours, about 41 days, on current TVs). freeSaver renews that session
+by itself each time it runs, the same as pressing **Extend** in the
+Developer Mode app, so it stays installed as long as you open it at least
+once every 41 days with the TV online. The menu shows how long is left under
+**Help**.
 
 ## Your own photos
 

@@ -1,0 +1,10 @@
+{
+  "id": "com.freesaver.app.service",
+  "description": "Keeps freeSaver's Developer Mode session alive",
+  "services": [
+    {
+      "name": "com.freesaver.app.service",
+      "description": "Keeps freeSaver's Developer Mode session alive"
+    }
+  ]
+}

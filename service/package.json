@@ -1,0 +1,7 @@
+{
+  "name": "com.freesaver.app.service",
+  "version": "1.0.0",
+  "description": "Keeps freeSaver's Developer Mode session alive",
+  "main": "service.js",
+  "license": "MIT"
+}

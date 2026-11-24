@@ -55,4 +55,6 @@ if (process.env.FREESAVER_PHOTO_SERVER) {
     `window.FREESAVER_LOCAL = ${JSON.stringify({ photoServers: hosts.map((h) => `http://${h}:${port}`) })};\n`);
 }
 
-execFileSync(join(root, 'node_modules', '.bin', 'ares-package'), ['--no-minify', stage, '-o', out], { stdio: 'inherit' });
+// The app plus its small background service (service/), in one package.
+execFileSync(join(root, 'node_modules', '.bin', 'ares-package'),
+  ['--no-minify', stage, join(root, 'service'), '-o', out], { stdio: 'inherit' });

@@ -566,6 +566,13 @@
       [[0, 'Never'], [2, '2 hours'], [4, '4 hours'], [8, '8 hours']], function () { applyFrame(); }));
 
     rows.push({ heading: 'Help' });
+    if (devState && devState.devMode) {
+      // Shown only on sideloaded installs. OK renews it straight away.
+      rows.push({
+        label: 'Stays installed for', count: Math.floor(devState.hoursLeft / 24) + ' days', plain: true, soft: true,
+        toggle: function () { keepInstalled().then(function () { if (menu.open) renderMenu(); }); }
+      });
+    }
     rows.push({ label: 'Remote buttons', count: '', plain: true, soft: true, toggle: function () { closeMenu(); showHint(); } });
     return rows;
   }
@@ -782,6 +789,36 @@
     return attempt(0);
   }
 
+  // ---------- staying installed ----------
+  // LG removes sideloaded apps when the TV's Developer Mode session runs out.
+  // The app's bundled service (service/service.js) resets that clock, the
+  // same as pressing Extend in the Developer Mode app, so the app looks
+  // after itself for as long as it is opened now and then.
+  var devState = null; // {devMode, hoursLeft} from the last call
+
+  function devMode(extend) {
+    return new Promise(function (resolve) {
+      if (!window.PalmServiceBridge) { resolve(null); return; }
+      var guard = setTimeout(function () { resolve(null); }, 40000);
+      try {
+        var bridge = new window.PalmServiceBridge();
+        bridge.onservicecallback = function (text) {
+          clearTimeout(guard);
+          try { resolve(JSON.parse(text)); } catch (e) { resolve(null); }
+        };
+        bridge.call('luna://com.freesaver.app.service/devmode', JSON.stringify({ extend: !!extend }));
+      } catch (e) { clearTimeout(guard); resolve(null); }
+    });
+  }
+
+  function keepInstalled() {
+    return devMode(true).then(function (r) {
+      if (r && r.returnValue) devState = r;
+      logEvent('devmode', r ? (r.devMode ? (r.hoursLeft + 'h' + (r.extended ? ' extended' : ' NOT extended')) : 'not in developer mode') : 'no answer');
+      return r;
+    });
+  }
+
   // ---------- remote control ----------
 
   var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
@@ -823,6 +860,8 @@
   applyClock();
   setInterval(updateClock, 10000);
   if (!prefs.seenHint) { showHint(); setTimeout(hideHint, 30000); }
+  setTimeout(keepInstalled, 20000);
+  setInterval(keepInstalled, 12 * 3600000);
   $('hint').addEventListener('click', hideHint);
 
   fetch('appinfo.json').then(function (r) { return r.json(); }).then(function (info) {
