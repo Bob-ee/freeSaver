@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { basename, dirname, extname, join } from 'node:path';
+import { networkInterfaces } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
@@ -39,5 +40,16 @@ sources.forEach((file, i) => {
 });
 writeFileSync(join(stage, 'photos.json'), JSON.stringify(manifest));
 console.log(`${manifest.length} photo(s) bundled` + (manifest.length ? '' : ' (the app will show museum art)'));
+
+// Where the TV can find this computer's live photo server (scripts/photo-server.mjs).
+// Baked into the package only, never into the repository.
+const PHOTO_PORT = process.env.FREESAVER_PHOTO_PORT || 8377;
+const hosts = [];
+try { hosts.push(execFileSync('scutil', ['--get', 'LocalHostName'], { encoding: 'utf8' }).trim() + '.local'); } catch { /* not macOS */ }
+for (const list of Object.values(networkInterfaces())) {
+  for (const a of list || []) if (a.family === 'IPv4' && !a.internal) hosts.push(a.address);
+}
+writeFileSync(join(stage, 'local.js'),
+  `window.FREESAVER_LOCAL = ${JSON.stringify({ photoServers: hosts.map((h) => `http://${h}:${PHOTO_PORT}`) })};\n`);
 
 execFileSync(join(root, 'node_modules', '.bin', 'ares-package'), ['--no-minify', stage, '-o', out], { stdio: 'inherit' });

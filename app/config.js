@@ -1,8 +1,7 @@
 // freeSaver settings. Edit, then run `npm run deploy` again.
 //
-// What to show can also be changed on the TV itself: press OK on the remote
-// to open the chooser. Choices made there are remembered and win over the
-// "categories", "sources" and "myPhotos" defaults below.
+// These are the defaults. Everything here can also be changed on the TV
+// itself: press OK on the remote. Choices made there are remembered and win.
 window.ARTFRAME_CONFIG = {
   // 'all', or a list picked from:
   //   'landscapes', 'seascapes', 'cities', 'impressionism', 'still-life',
@@ -53,5 +52,9 @@ window.ARTFRAME_CONFIG = {
   caption: 'never',
 
   // Small clock in the corner.
-  clock: false
+  clock: false,
+
+  // OLED care: hours after which the picture frame steps aside for the rest
+  // of the session (0 = never). The frame is the one thing that never moves.
+  frameRestHours: 4
 };

@@ -33,7 +33,6 @@
     ['space', 'Space']
   ];
 
-  var HOLD_MS = Math.max(0.1, Number(cfg.minutesPerPhoto) || 5) * 60000;
   var FADE_MS = Math.max(0, Number(cfg.fadeSeconds) || 0) * 1000;
   var MAX_CROP = Math.min(0.9, Math.max(0, Number(cfg.maxCrop)));
   var LOAD_TIMEOUT_MS = 45000;
@@ -44,7 +43,9 @@
   var $ = function (id) { return document.getElementById(id); };
   var slides = [$('slideA'), $('slideB')];
   var front = 0;            // index of the slide currently shown
-  var localItems = [];      // the owner's own photos
+  var bundledPhotos = [];   // the owner's photos baked into the app
+  var livePhotos = [];      // the owner's photos served live from their computer
+  var localItems = [];      // both of the above
   var artItems = [];        // bundled museum catalogue
   var sources = [];         // [{id, label}]
   var playlist = [];
@@ -54,6 +55,25 @@
   var generation = 0;       // bumped whenever the playlist is rebuilt
   var captionTimer = null;
   var prefs = readPrefs();  // choices made with the remote; override config.js
+
+  // ---------- diagnostics ----------
+  // A short rolling log kept on the TV, for checking how a long session went
+  // (read it from the web inspector: JSON.parse(localStorage['freesaver.log'])).
+  var stats = { shown: 0, failed: 0, drawn: 0 };
+  function logEvent(what, detail) {
+    try {
+      var log = JSON.parse(localStorage.getItem('freesaver.log') || '[]');
+      log.push([new Date().toISOString(), what, detail === undefined ? '' : detail]);
+      localStorage.setItem('freesaver.log', JSON.stringify(log.slice(-400)));
+    } catch (e) { /* no storage */ }
+  }
+  window.addEventListener('error', function (e) { logEvent('error', String(e.message).slice(0, 200)); });
+  document.addEventListener('visibilitychange', function () { logEvent(document.hidden ? 'hidden' : 'visible'); });
+  setInterval(function () {
+    var v = $('keepawake');
+    logEvent('beat', [stats.shown, stats.failed, stats.drawn, v.paused ? 'video-paused' : 'video-ok',
+      window.performance && performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1e6) + 'MB' : ''].join(' '));
+  }, 10 * 60000);
 
   // ---------- helpers ----------
 
@@ -112,7 +132,7 @@
     try { p = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { /* no storage */ }
     p = p || {};
     return { cats: p.cats || {}, sources: p.sources || {}, photos: p.photos, frame: p.frame, vivid: p.vivid, gen: p.gen,
-             hidden: p.hidden || {} };
+             hidden: p.hidden || {}, favs: p.favs || {}, favOnly: !!p.favOnly, set: p.set || {}, seenHint: !!p.seenHint };
   }
 
   function writePrefs() {
@@ -128,13 +148,34 @@
   function genOn() { return !!Gen && (typeof prefs.gen === 'boolean' ? prefs.gen : cfg.generative !== false); }
   function photosOn() { return typeof prefs.photos === 'boolean' ? prefs.photos : cfg.myPhotos !== false; }
 
+  // Settings changed from the menu, falling back to config.js.
+  function opt(key, fallback) { return key in prefs.set ? prefs.set[key] : fallback; }
+  function holdMs() { return Math.max(0.1, Number(opt('minutes', cfg.minutesPerPhoto)) || 5) * 60000; }
+  function nightOn() { return !!opt('night', !!cfg.night); }
+  function clockOn() { return !!opt('clock', !!cfg.clock); }
+  function captionMode() { return opt('caption', cfg.caption || 'never'); }
+  function restHours() { return Number(opt('rest', cfg.frameRestHours == null ? 4 : cfg.frameRestHours)) || 0; }
+
   // 'random' means one frame picked when the app starts and kept until it closes.
   var Border = window.ArtFrameBorder;
   var sessionFrame = Border.random();
+  var frameSince = Date.now();
+  var frameNudged = Date.now();
   function frameChoice() { return prefs.frame || cfg.frame || 'random'; }
-  function applyFrame() {
+  function applyFrame(nudge) {
     var choice = frameChoice();
-    Border.apply(choice === 'random' ? sessionFrame : choice);
+    // OLED care: after a few hours the frame steps aside for the rest of
+    // the session, since it is the one thing on screen that never changes.
+    var resting = restHours() > 0 && Date.now() - frameSince > restHours() * 3600000;
+    Border.apply(resting ? 'none' : (choice === 'random' ? sessionFrame : choice), nudge);
+  }
+  // Called after each picture change: every quarter of an hour, shift the
+  // frame's edges by a pixel or two.
+  function careForPanel() {
+    if (Date.now() - frameNudged < 15 * 60000) return;
+    frameNudged = Date.now();
+    var px = function () { return Math.floor(Math.random() * 5) - 2; };
+    setTimeout(function () { applyFrame([px(), px()]); }, FADE_MS + 4000);
   }
 
   function loadImage(urls) {
@@ -142,7 +183,7 @@
     return new Promise(function (resolve, reject) {
       var i = 0;
       function attempt() {
-        if (i >= urls.length) { reject(new Error('image failed')); return; }
+        if (i >= urls.length) { stats.failed++; reject(new Error('image failed')); return; }
         var url = urls[i++];
         var img = new Image();
         var done = false;
@@ -177,10 +218,12 @@
     // Draw at the panel's real pixel density (2x on a 4K TV) so it is sharp.
     var density = Math.min(window.devicePixelRatio || 1, 2);
     var opts = { width: Math.round(box.width * density), height: Math.round(box.height * density) };
-    if (vividOn()) opts.mood = 'vivid'; // otherwise the generator picks freely, quiet pieces included
+    if (item.fixed) { opts.style = item.fixed[0]; opts.seed = item.fixed[1]; opts.mood = item.fixed[2]; } // a saved favourite
+    else if (vividOn()) opts.mood = 'vivid'; // otherwise the generator picks freely, quiet pieces included
     return Gen.make(opts).then(function (made) {
       item.title = made.title || '';
       item.sub = made.sub || '';
+      item.made = [made.style, made.seed, made.mood];
       return loadImage([made.url]);
     });
   }
@@ -232,6 +275,14 @@
   }
 
   function selection() {
+    var favKeys = Object.keys(prefs.favs);
+    if (prefs.favOnly && favKeys.length) {
+      return favKeys.map(function (k) {
+        var f = prefs.favs[k];
+        return f.g ? { gen: true, fixed: f.g, title: f.t || '', sub: f.s || '' }
+                   : { urls: f.u, title: f.t || '', sub: f.s || '', cats: f.c || [], source: f.o };
+      });
+    }
     var items = photosOn() ? localItems.slice() : [];
     artItems.forEach(function (w) {
       if (prefs.hidden[w.urls[0]]) return; // thumbs-downed with the remote
@@ -280,7 +331,7 @@
     img.style.transition = 'none';
     img.style.transform = zoomIn ? near : far;
     void img.offsetWidth; // commit the start position before animating
-    img.style.transition = 'transform ' + Math.round((HOLD_MS + FADE_MS * 2) / 1000) + 's linear';
+    img.style.transition = 'transform ' + Math.round((holdMs() + FADE_MS * 2) / 1000) + 's linear';
     img.style.transform = zoomIn ? far : near;
   }
 
@@ -313,13 +364,15 @@
     slide.replaceChild(img, old);
     applyDrift(img);
 
+    stats.shown++;
+    if (item.gen) stats.drawn++;
     slide.classList.add('visible');
     slides[front].classList.remove('visible');
     front = back;
     say('');
 
-    if (cfg.caption === 'always') showCaption(item, true);
-    else if (cfg.caption === 'onChange' || announce) showCaption(item, false);
+    if (captionMode() === 'always') showCaption(item, true);
+    else if (captionMode() === 'onChange' || announce) showCaption(item, false);
     else $('caption').classList.remove('visible');
   }
 
@@ -344,6 +397,19 @@
     prepared.promise.catch(function () {});
   }
 
+  // The timed move to the next picture. If the owner's photos changed on
+  // their computer in the meantime, rebuild the rotation first.
+  var photosChanged = false;
+  function advance() {
+    if (photosChanged && !menu.open) { photosChanged = false; restart(); return; }
+    step(1, false);
+  }
+  function reschedule() {
+    if (busy || !playlist.length) return;
+    clearTimeout(timer);
+    timer = setTimeout(advance, holdMs());
+  }
+
   // direction: 1 next, -1 previous. announce: show the caption (manual skip).
   function step(direction, announce) {
     if (busy || !playlist.length) return;
@@ -355,8 +421,18 @@
     function tryNext() {
       if (mine !== generation) return;
       if (tries++ >= Math.min(playlist.length, 8)) {
-        busy = false;
-        timer = setTimeout(function () { step(1, false); }, 60000); // network hiccup: retry in a minute
+        // Nothing would load: most likely the network is down. Draw a
+        // picture instead of sitting on a stale one, and try again shortly.
+        var again = function () { busy = false; timer = setTimeout(advance, 60000); };
+        if (!Gen) { again(); return; }
+        var spare = { gen: true, title: '', sub: '' };
+        obtain(spare).then(function (loaded) {
+          if (mine !== generation) return;
+          present(spare, loaded, false);
+          playlist.splice(position + 1, 0, spare); // so favourites and captions refer to it
+          position++;
+          again();
+        }, again);
         return;
       }
       var wrapped = direction > 0 && position === playlist.length - 1;
@@ -374,8 +450,9 @@
         if (mine !== generation) return;
         present(item, loaded, announce);
         busy = false;
-        timer = setTimeout(function () { step(1, false); }, HOLD_MS);
+        timer = setTimeout(advance, holdMs());
         setTimeout(function () { if (mine === generation) prepareNext(); }, FADE_MS + 1500);
+        careForPanel();
       }, tryNext);
     }
     tryNext();
@@ -400,6 +477,13 @@
       });
     }
     rows.push({ heading: 'Show' });
+    var favCount = Object.keys(prefs.favs).length;
+    if (favCount) {
+      rows.push({
+        label: 'Favourites only', count: favCount, on: prefs.favOnly,
+        toggle: function () { prefs.favOnly = !prefs.favOnly; }
+      });
+    }
     rows.push({
       label: 'Vivid only', count: '', on: vividOn(),
       toggle: function () { prefs.vivid = !vividOn(); }
@@ -441,10 +525,41 @@
     [['random', 'A new one each time'], ['none', 'No frame']].concat(Border.styles).forEach(function (f) {
       rows.push({
         label: f[1], count: '', radio: true, on: frameChoice() === f[0],
-        toggle: function () { prefs.frame = f[0]; applyFrame(); }
+        toggle: function () { prefs.frame = f[0]; frameSince = Date.now(); applyFrame(); }
       });
     });
+
+    rows.push({ heading: 'Settings' });
+    rows.push(cycleRow('Change picture every', 'minutes', Number(opt('minutes', cfg.minutesPerPhoto)),
+      [[1, '1 min'], [2, '2 min'], [5, '5 min'], [10, '10 min'], [15, '15 min'], [30, '30 min'], [60, '1 hour']], reschedule));
+    rows.push(cycleRow('Brightness', 'brightness', Number(opt('brightness', cfg.brightness)),
+      [[0.4, '40%'], [0.55, '55%'], [0.7, '70%'], [0.85, '85%'], [1, '100%']], updateDimmer));
+    rows.push(cycleRow('Dim at night', 'night', nightOn(), [[false, 'Off'], [true, 'On']], updateDimmer));
+    rows.push(cycleRow('Titles', 'caption', captionMode(),
+      [['never', 'Hidden'], ['onChange', 'Briefly'], ['always', 'Always']], function () {
+        if (captionMode() === 'always') showCaption(playlist[position], true);
+        else $('caption').classList.remove('visible');
+      }));
+    rows.push(cycleRow('Clock', 'clock', clockOn(), [[false, 'Off'], [true, 'On']], applyClock));
+    rows.push(cycleRow('Frame rests after', 'rest', restHours(),
+      [[0, 'Never'], [2, '2 hours'], [4, '4 hours'], [8, '8 hours']], function () { applyFrame(); }));
+
+    rows.push({ heading: 'Help' });
+    rows.push({ label: 'Remote buttons', count: '', plain: true, soft: true, toggle: function () { closeMenu(); showHint(); } });
     return rows;
+  }
+
+  // A settings row that steps through a list of values with OK or left/right.
+  function cycleRow(label, key, current, choices, after) {
+    var at = 0;
+    choices.forEach(function (c, i) { if (c[0] === current) at = i; });
+    return {
+      label: label, value: choices[at][1], soft: true,
+      cycle: function (dir) {
+        prefs.set[key] = choices[(at + dir + choices.length) % choices.length][0];
+        if (after) after();
+      }
+    };
   }
 
   function renderMenu() {
@@ -458,10 +573,11 @@
         el.className = 'heading';
         el.textContent = row.heading;
       } else {
-        el.className = 'row' + (row.radio ? ' radio' : '') + (row.on ? ' on' : '') + (i === keep ? ' focus' : '');
+        el.className = 'row' + (row.radio ? ' radio' : '') + (row.cycle || row.plain ? ' cycle on' : '') +
+          (row.on ? ' on' : '') + (i === keep ? ' focus' : '');
         var box = document.createElement('span'); box.className = 'box';
         var name = document.createElement('span'); name.className = 'name'; name.textContent = row.label;
-        var num = document.createElement('span'); num.className = 'num'; num.textContent = row.count;
+        var num = document.createElement('span'); num.className = 'num'; num.textContent = row.cycle ? row.value : row.count;
         el.appendChild(box); el.appendChild(name); el.appendChild(num);
         el.addEventListener('click', function () { menu.focus = i; toggleRow(); });
       }
@@ -479,13 +595,15 @@
     if (menu.rows[i]) { menu.focus = i; renderMenu(); }
   }
 
-  function toggleRow() {
+  function toggleRow(dir) {
     var row = menu.rows[menu.focus];
     if (!row || row.heading) return;
-    row.toggle();
-    menu.dirty = true;
+    if (row.cycle) row.cycle(dir || 1);
+    else if (dir) return; // left/right only act on settings rows
+    else row.toggle();
+    if (!row.soft) menu.dirty = true; // settings apply at once; content changes rebuild the rotation
     writePrefs();
-    renderMenu();
+    if (menu.open) renderMenu();
   }
 
   function openMenu() {
@@ -507,12 +625,12 @@
   // ---------- brightness, clock, keep-awake ----------
 
   function updateDimmer() {
-    var level = Number(cfg.brightness) || 1;
-    var n = cfg.night;
-    if (n && typeof n.from === 'number' && typeof n.to === 'number') {
+    var level = Number(opt('brightness', cfg.brightness)) || 1;
+    var n = cfg.night || { from: 22, to: 7, brightness: 0.45 };
+    if (nightOn() && typeof n.from === 'number' && typeof n.to === 'number') {
       var h = new Date().getHours();
       var isNight = n.from > n.to ? (h >= n.from || h < n.to) : (h >= n.from && h < n.to);
-      if (isNight) level = Number(n.brightness) || level;
+      if (isNight) level = Math.min(level, Number(n.brightness) || level);
     }
     level = Math.min(1, Math.max(0.1, level));
     $('dimmer').style.opacity = String(1 - level);
@@ -523,6 +641,11 @@
     var h = d.getHours() % 12 || 12;
     var m = d.getMinutes();
     $('clock').textContent = h + ':' + (m < 10 ? '0' : '') + m;
+  }
+
+  function applyClock() {
+    $('clock').style.display = clockOn() ? 'block' : 'none';
+    updateClock();
   }
 
   function keepAwake() {
@@ -571,17 +694,87 @@
     if (playlist.length) step(1, false); else restart();
   }
 
+  // ---------- favourites (press Up) ----------
+
+  function favKey(item) {
+    if (item.gen) return item.made ? 'gen:' + item.made.join(':') : null;
+    return item.urls[0];
+  }
+
+  function toggleFavourite() {
+    var item = playlist[position];
+    var key = item && favKey(item);
+    if (!key || busy) return;
+    if (prefs.favs[key]) {
+      delete prefs.favs[key];
+      notice('Removed from favourites', item.title);
+    } else {
+      prefs.favs[key] = item.gen
+        ? { g: item.made, t: item.title, s: item.sub }
+        : { u: item.urls, t: item.title, s: item.sub, c: item.cats, o: item.source };
+      notice('\u2665  Saved to favourites', item.title);
+    }
+    writePrefs();
+  }
+
+  // ---------- first-run guide ----------
+
+  function showHint() { $('hint').classList.add('open'); }
+  function hideHint() {
+    $('hint').classList.remove('open');
+    if (!prefs.seenHint) { prefs.seenHint = true; writePrefs(); }
+  }
+
+  // ---------- the owner's photos, served live from their computer ----------
+
+  var photoServers = ((window.FREESAVER_LOCAL || {}).photoServers || []).concat(cfg.photoServers || []);
+  var photoBase = null;     // the address that answered last time
+  var photoVersion = null;
+
+  function fetchJson(url, ms) {
+    var ctl = window.AbortController ? new AbortController() : null;
+    var guard = setTimeout(function () { if (ctl) ctl.abort(); }, ms);
+    return fetch(url, ctl ? { signal: ctl.signal } : {}).then(function (r) {
+      clearTimeout(guard);
+      if (!r.ok) throw new Error(url + ' ' + r.status);
+      return r.json();
+    });
+  }
+
+  // Resolves to true if the set of live photos changed.
+  function refreshLivePhotos() {
+    var order = photoBase ? [photoBase].concat(photoServers.filter(function (s) { return s !== photoBase; })) : photoServers.slice();
+    function attempt(i) {
+      if (i >= order.length) return Promise.resolve(false); // computer asleep or away: keep what we have
+      var base = order[i].replace(/\/+$/, '');
+      return fetchJson(base + '/photos.json', 5000).then(function (body) {
+        photoBase = order[i];
+        if (body.version === photoVersion) return false;
+        photoVersion = body.version;
+        livePhotos = (body.photos || []).map(function (p) {
+          return { urls: [base + p.src], title: p.title || '', sub: '', ar: p.ar };
+        });
+        localItems = bundledPhotos.concat(livePhotos);
+        return true;
+      }, function () { return attempt(i + 1); });
+    }
+    return attempt(0);
+  }
+
   // ---------- remote control ----------
 
   var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
 
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
+    if ($('hint').classList.contains('open')) { hideHint(); e.preventDefault(); return; }
     if (menu.open) {
       if (k === KEY.UP) moveFocus(-1);
       else if (k === KEY.DOWN) moveFocus(1);
       else if (k === KEY.OK) toggleRow();
-      else if (k === KEY.BACK || k === KEY.ESC || k === KEY.LEFT || k === KEY.RIGHT) closeMenu();
+      else if (k === KEY.LEFT) toggleRow(-1);
+      else if (k === KEY.RIGHT) toggleRow(1);
+      else if (k === KEY.BACK || k === KEY.ESC) closeMenu();
       else return;
       e.preventDefault();
       return;
@@ -589,7 +782,8 @@
     if (k === KEY.RIGHT) step(1, true);
     else if (k === KEY.LEFT) step(-1, true);
     else if (k === KEY.DOWN) hideCurrent();
-    else if (k === KEY.OK || k === KEY.UP) openMenu();
+    else if (k === KEY.UP) toggleFavourite();
+    else if (k === KEY.OK) openMenu();
     else if (k === KEY.BACK || k === KEY.ESC) window.close();
     else return;
     e.preventDefault();
@@ -600,19 +794,33 @@
   // ---------- start ----------
 
   slides.forEach(function (s) { s.style.transitionDuration = FADE_MS + 'ms'; });
+  logEvent('start', navigator.userAgent.replace(/.*(Chrome\/[\d.]+).*/, '$1'));
   applyFrame();
   keepAwake();
   updateDimmer();
   setInterval(updateDimmer, 60000);
-  if (cfg.clock) {
-    $('clock').style.display = 'block';
-    updateClock();
-    setInterval(updateClock, 10000);
-  }
+  applyClock();
+  setInterval(updateClock, 10000);
+  if (!prefs.seenHint) { showHint(); setTimeout(hideHint, 30000); }
+  $('hint').addEventListener('click', hideHint);
 
-  Promise.all([loadLocal(), loadArt()]).then(function (loaded) {
-    localItems = loaded[0];
+  fetch('appinfo.json').then(function (r) { return r.json(); }).then(function (info) {
+    var v = document.createElement('small');
+    v.textContent = info.version;
+    $('menuTitle').appendChild(v);
+  }).catch(function () {});
+
+  // Do not hold the first picture up for a computer that may be asleep.
+  var live = Promise.race([refreshLivePhotos(), new Promise(function (r) { setTimeout(function () { r(false); }, 3000); })]);
+  Promise.all([loadLocal(), loadArt(), live]).then(function (loaded) {
+    bundledPhotos = loaded[0];
+    localItems = bundledPhotos.concat(livePhotos);
     artItems = loaded[1];
     restart();
   });
+  if (photoServers.length) {
+    setInterval(function () {
+      refreshLivePhotos().then(function (changed) { if (changed) photosChanged = true; });
+    }, 5 * 60000);
+  }
 })();

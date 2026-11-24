@@ -78,7 +78,14 @@
     return d;
   }
 
-  function apply(id) {
+  // The mat colour and grain of each style are chosen once and then kept, so
+  // a frame looks the same for the whole session.
+  var look = {};
+
+  // nudge: a few pixels of change in the frame's widths. Applied now and
+  // then so the frame's edges do not rest on exactly the same pixels for
+  // hours (OLED care). Too small to notice.
+  function apply(id, nudge) {
     var host = document.getElementById('frame');
     var style = STYLES[id];
     host.textContent = '';
@@ -89,11 +96,13 @@
     }
 
     var u = window.innerHeight / 100;
-    var W = Math.round(style.rail * u);
+    var n = nudge || [0, 0];
+    var W = Math.max(6, Math.round(style.rail * u) + n[0]);
     var F = Math.round(style.fillet * u);
-    var M = Math.round(style.mat * u);
+    var M = Math.max(3, Math.round(style.mat * u) + n[1]);
     var B = Math.round((style.bevel === 0 ? 0 : BEVEL) * u);
-    var seed = Math.floor(Math.random() * 100000);
+    var kept = look[id] || (look[id] = { seed: Math.floor(Math.random() * 100000), mat: pick(style.mats) });
+    var seed = kept.seed;
     var profile = style.profile.join(', ');
 
     // Four mitred lengths of moulding, lit from the upper left.
@@ -119,7 +128,7 @@
     });
 
     // Fillet (a thin inner lip) and the mat.
-    var matColor = pick(style.mats);
+    var matColor = kept.mat;
     var f4 = style.fillet4 || ['transparent', 'transparent', 'transparent', 'transparent'];
     var mat = el('mat', {
       position: 'absolute', top: W + 'px', left: W + 'px', right: W + 'px', bottom: W + 'px',
@@ -155,7 +164,7 @@
   window.ArtFrameBorder = {
     styles: Object.keys(STYLES).map(function (id) { return [id, STYLES[id].label]; }),
     random: function () { return pick(Object.keys(STYLES)); },
-    apply: function (id) { current = STYLES[id] ? id : 'none'; apply(current); }
+    apply: function (id, nudge) { current = STYLES[id] ? id : 'none'; apply(current, nudge); }
   };
   window.addEventListener('resize', function () { apply(current); });
 })();
