@@ -115,12 +115,25 @@ await Promise.all(Array.from({ length: 8 }, async () => {
 mkdirSync(dirname(cacheFile), { recursive: true });
 writeFileSync(cacheFile, JSON.stringify(scores));
 
+// Thumbnails are kept beside the scores (not in the app) for the review
+// sheets made by scripts/contact-sheets.py.
+const thumbFile = join(here, '.cache', 'thumbs.json');
+const thumbs = existsSync(thumbFile) ? JSON.parse(readFileSync(thumbFile, 'utf8')) : {};
+for (const w of works) if (w.thumb) thumbs[w.src[0]] = w.thumb;
+writeFileSync(thumbFile, JSON.stringify(thumbs));
+
+// Works rejected by eye (scripts/rejects.json: { "<first image URL>": "reason" }).
+const rejectFile = join(here, 'rejects.json');
+const rejects = existsSync(rejectFile) ? JSON.parse(readFileSync(rejectFile, 'utf8')) : {};
+let rejected = 0;
+
 const kept = [];
 const dropped = {};
 for (const w of works) {
   const s = w.fresh ? scores[w.thumb || w.src[w.src.length - 1]] : null; // older works were vetted already
   delete w.thumb; // build-time only; keeps the bundled file small
   delete w.fresh;
+  if (rejects[w.src[0]]) { rejected++; continue; }
   if (s && w.source !== 'nasa' && (s.l < MIN_LIGHT || s.c < MIN_COLOUR)) { // space is meant to be dark
     dropped[w.source] = (dropped[w.source] || 0) + 1;
     continue;
@@ -129,6 +142,7 @@ for (const w of works) {
   kept.push(w);
 }
 console.log(`unscored (thumbnail unavailable): ${kept.filter((w) => w.v == null).length}`);
+console.log(`rejected by review: ${rejected}`);
 console.log('dropped as too dark or colourless: ' + (Object.entries(dropped).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'));
 
 const liveSources = sources.filter((s) => kept.some((w) => w.source === s.id));

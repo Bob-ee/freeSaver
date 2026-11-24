@@ -8,7 +8,16 @@
     "deploy": "npm run build && ares-install --device tv build/*.ipk && ares-launch --device tv com.freesaver.app",
     "launch": "ares-launch --device tv com.freesaver.app",
     "inspect": "ares-inspect --device tv --app com.freesaver.app --open",
-    "art:refresh": "node scripts/fetch-art.mjs"
+    "art:refresh": "node scripts/fetch-art.mjs",
+    "devmode:extend": "node scripts/devmode-extend.mjs",
+    "devmode:check": "node scripts/devmode-extend.mjs --check",
+    "devmode:schedule": "sh scripts/devmode-schedule.sh install",
+    "devmode:unschedule": "sh scripts/devmode-schedule.sh uninstall",
+    "photos:serve": "node scripts/photo-server.mjs",
+    "photos:schedule": "sh scripts/photo-server-schedule.sh install",
+    "photos:unschedule": "sh scripts/photo-server-schedule.sh uninstall",
+    "soak": "node scripts/soak.mjs",
+    "sheets": "python3 scripts/contact-sheets.py"
   },
   "keywords": [],
   "author": "",

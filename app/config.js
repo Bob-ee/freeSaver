@@ -27,7 +27,7 @@ window.ARTFRAME_CONFIG = {
   maxCrop: 0.3,
 
   // Picture frame drawn around the art. 'random' picks one each time the app
-  // starts and keeps it for that session. Or 'none', 'walnut', 'oak',
+  // starts and keeps it for that session (see frameChangeMinutes below). Or 'none', 'walnut', 'oak',
   // 'ebony', 'gilt', 'float'. Can also be changed from the chooser.
   frame: 'random',
 
@@ -53,6 +53,11 @@ window.ARTFRAME_CONFIG = {
 
   // Small clock in the corner.
   clock: false,
+
+  // With the frame on 'random': how often to switch to a different frame
+  // style, in minutes. 0 keeps one frame for the whole session. On panels
+  // prone to burn-in, changing it now and then spreads the wear.
+  frameChangeMinutes: 0,
 
   // OLED care: hours after which the picture frame steps aside for the rest
   // of the session (0 = never). The frame is the one thing that never moves.

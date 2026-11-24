@@ -1,3 +1,3 @@
-// Replaced at build time (scripts/build.mjs) with details of the machine the
-// app was built on, such as where its live photo server can be reached.
+// Normally empty. A build made with FREESAVER_PHOTO_SERVER=1 replaces this
+// with the address of a photo server on the builder's own computer.
 window.FREESAVER_LOCAL = {};

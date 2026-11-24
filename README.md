@@ -29,20 +29,24 @@ scored for brightness and colour so murky ones are left out.
 ## Features
 
 - Pictures crop to fill the screen, with a slow drift so nothing sits still.
-- Picture frames (walnut, oak, black lacquer, gilt, thin float) drawn in CSS,
-  one chosen per session, or none.
+- Picture frames (walnut, oak, black lacquer, gilt, thin float) drawn in CSS:
+  one per session, a rotating mix, or none.
 - Generative art in 15 styles and two moods (vivid and quiet).
 - A varied rotation: the same kind of picture never comes up twice in a row.
-- On-screen chooser for categories, sources, frame style and "vivid only".
-- Thumbs-down any picture so it never comes back.
-- Dims at night.
+- Everything is set on the TV with the remote: categories, sources, frame,
+  "vivid only", picture interval, brightness, night dimming, titles, clock.
+- Save favourites and play only those; thumbs-down a picture so it never
+  comes back.
+- Keeps working without internet by drawing generative art.
+- Nothing to run on a computer once it is installed.
 
 ## Remote control
 
 | Button | Action |
 | --- | --- |
 | Left / Right | Previous / next picture |
-| OK | Open the chooser |
+| OK | Open the menu |
+| Up | Save to favourites |
 | Down, twice | Never show this picture again |
 | Back | Exit |
 
@@ -69,19 +73,25 @@ and bundling your own photos uses macOS `sips`.
 
 ### Developer Mode expires
 
-LG removes sideloaded apps when the Developer Mode session runs out (1,000
-hours on current TVs). Open the Developer Mode app and press **Extend**
-before then, or run `npm run deploy` again afterwards.
+This is LG's rule for any sideloaded app, not something freeSaver can change:
+the TV removes sideloaded apps when the Developer Mode session runs out
+(1,000 hours on current TVs). Open the Developer Mode app on the TV and press
+**Extend** now and then to reset the clock.
+
+If you keep a computer around anyway, `npm run devmode:extend` does the same
+thing from there, and `npm run devmode:schedule` (macOS) repeats it daily.
+Both are optional conveniences.
 
 ## Your own photos
 
 Put pictures in `photos/` and run `npm run deploy`. They are converted to
-JPEG (4K at most) and bundled into the app. That folder is git-ignored.
+JPEG (4K at most) and bundled into the app, so the TV needs nothing else.
+That folder is git-ignored.
 
 ## Settings
 
-Edit `app/config.js` and deploy again: minutes per picture, brightness, night
-dimming, captions, clock, default categories and frame.
+Use the menu on the TV (OK). `app/config.js` only holds the defaults a fresh
+install starts with.
 
 ## Refreshing the catalogue
 
@@ -104,9 +114,12 @@ stand in for the remote.
 
 ## OLED care
 
-A picture frame is a static shape. The app keeps pictures moving and dims the
-whole screen, and the TV's own panel care still applies, but if you leave it
-on for many hours a day consider the thin frame or no frame.
+A picture frame is a static shape, so the app looks after the panel: pictures
+drift slowly, the frame's edges shift by a pixel or two every quarter of an
+hour, and after four hours the frame steps aside for the rest of the session.
+For panels prone to burn-in, set **Change frame** in the menu so the frame
+style itself rotates, or choose no frame. The TV's own panel care still
+applies.
 
 ## Licence
 

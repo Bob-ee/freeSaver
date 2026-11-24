@@ -154,6 +154,7 @@
   function nightOn() { return !!opt('night', !!cfg.night); }
   function clockOn() { return !!opt('clock', !!cfg.clock); }
   function captionMode() { return opt('caption', cfg.caption || 'never'); }
+  function frameEveryMin() { return Number(opt('frameEvery', cfg.frameChangeMinutes)) || 0; }
   function restHours() { return Number(opt('rest', cfg.frameRestHours == null ? 4 : cfg.frameRestHours)) || 0; }
 
   // 'random' means one frame picked when the app starts and kept until it closes.
@@ -169,6 +170,22 @@
     var resting = restHours() > 0 && Date.now() - frameSince > restHours() * 3600000;
     Border.apply(resting ? 'none' : (choice === 'random' ? sessionFrame : choice), nudge);
   }
+  // For panels where a fixed frame is a worry: with the frame set to
+  // 'random', swap to a different style as often as the owner chooses. Each
+  // style has different widths, so its edges land on different pixels.
+  // Called just as a new picture fades in.
+  var frameChanged = Date.now();
+  function rotateFrame() {
+    var every = frameEveryMin();
+    if (frameChoice() !== 'random' || every <= 0 || Border.styles.length < 2) return;
+    if (Date.now() - frameChanged < every * 60000 - 5000) return;
+    frameChanged = Date.now();
+    var next;
+    do { next = Border.random(); } while (next === sessionFrame);
+    sessionFrame = next;
+    applyFrame();
+  }
+
   // Called after each picture change: every quarter of an hour, shift the
   // frame's edges by a pixel or two.
   function careForPanel() {
@@ -448,6 +465,7 @@
       else ready = obtain(item);
       ready.then(function (loaded) {
         if (mine !== generation) return;
+        if (!announce) rotateFrame(); // not on a manual skip, so flipping through pictures stays calm
         present(item, loaded, announce);
         busy = false;
         timer = setTimeout(advance, holdMs());
@@ -522,7 +540,7 @@
       });
     }
     rows.push({ heading: 'Frame' });
-    [['random', 'A new one each time'], ['none', 'No frame']].concat(Border.styles).forEach(function (f) {
+    [['random', 'Mix of frames'], ['none', 'No frame']].concat(Border.styles).forEach(function (f) {
       rows.push({
         label: f[1], count: '', radio: true, on: frameChoice() === f[0],
         toggle: function () { prefs.frame = f[0]; frameSince = Date.now(); applyFrame(); }
@@ -541,6 +559,9 @@
         else $('caption').classList.remove('visible');
       }));
     rows.push(cycleRow('Clock', 'clock', clockOn(), [[false, 'Off'], [true, 'On']], applyClock));
+    rows.push(cycleRow('Change frame', 'frameEvery', frameEveryMin(),
+      [[0, 'Each session'], [240, 'Every 4 hours'], [60, 'Every hour'], [15, 'Every 15 min'], [0.01, 'Every picture']],
+      function () { frameChanged = Date.now(); }));
     rows.push(cycleRow('Frame rests after', 'rest', restHours(),
       [[0, 'Never'], [2, '2 hours'], [4, '4 hours'], [8, '8 hours']], function () { applyFrame(); }));
 
