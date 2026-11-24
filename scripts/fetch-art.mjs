@@ -66,11 +66,26 @@ if (!works.length) throw new Error('no works at all; leaving app/art.json untouc
 // ---- Score every picture for brightness and colour, and drop the murky ones.
 // Each thumbnail is decoded to 32x32 RGB by ffmpeg. Scores are cached, so
 // only new pictures cost anything on later runs.
-const MIN_LIGHT = 62;    // mean brightness 0-255: below this the picture is mostly dark
-const MIN_COLOUR = 16;   // Hasler-Susstrunk colourfulness: below this it is near-monochrome
-const cacheFile = join(here, '.cache', 'scores.json');
+//
+// "Variety" is how much the colour differs across the picture. An overall
+// tint does not count: a sepia photograph or a drawing on yellowed paper is
+// strongly tinted but has almost no variety, and those are what we leave out.
+const MIN_LIGHT = 62;     // mean brightness 0-255: below this the picture is mostly dark
+const MIN_VARIETY = 12;   // below this it is monochrome, whatever its tint
+const cacheDir = join(here, '.cache');
+mkdirSync(cacheDir, { recursive: true });
+const cacheFile = join(cacheDir, 'scores.json');
 const scores = existsSync(cacheFile) ? JSON.parse(readFileSync(cacheFile, 'utf8')) : {};
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36';
+
+// Thumbnails are remembered beside the scores (not in the app), both for
+// scoring works that were not re-fetched this run and for the review sheets
+// made by scripts/contact-sheets.py.
+const thumbFile = join(cacheDir, 'thumbs.json');
+const thumbs = existsSync(thumbFile) ? JSON.parse(readFileSync(thumbFile, 'utf8')) : {};
+for (const w of works) if (w.thumb) thumbs[w.src[0]] = w.thumb;
+writeFileSync(thumbFile, JSON.stringify(thumbs));
+const thumbOf = (w) => w.thumb || thumbs[w.src[0]] || w.src[w.src.length - 1];
 
 async function measure(url) {
   let bytes;
@@ -93,57 +108,54 @@ async function measure(url) {
         rg += a; yb += c; rg2 += a * a; yb2 += c * c;
       }
       const mrg = rg / n, myb = yb / n;
-      const colour = Math.sqrt(rg2 / n - mrg * mrg + (yb2 / n - myb * myb)) + 0.3 * Math.sqrt(mrg * mrg + myb * myb);
-      resolve({ l: Math.round(light / n), c: Math.round(colour) });
+      const variety = Math.sqrt(Math.max(0, rg2 / n - mrg * mrg) + Math.max(0, yb2 / n - myb * myb));
+      resolve({ l: Math.round(light / n), s: Math.round(variety * 10) / 10 });
     });
     child.stdin.on('error', () => {});
     child.stdin.end(bytes);
   });
 }
 
-const todo = works.filter((w) => w.fresh && !scores[w.thumb || w.src[w.src.length - 1]]);
-if (todo.length) console.log(`scoring ${todo.length} new pictures...`);
+const todo = works.filter((w) => { const s = scores[thumbOf(w)]; return !s || s.s === undefined; });
+if (todo.length) console.log(`scoring ${todo.length} pictures...`);
 let next = 0;
 await Promise.all(Array.from({ length: 8 }, async () => {
   while (next < todo.length) {
     const w = todo[next++];
-    const url = w.thumb || w.src[w.src.length - 1];
-    const s = await measure(url);
-    if (s) scores[url] = s;
+    const s = await measure(thumbOf(w));
+    if (s) scores[thumbOf(w)] = s;
   }
 }));
-mkdirSync(dirname(cacheFile), { recursive: true });
 writeFileSync(cacheFile, JSON.stringify(scores));
 
-// Thumbnails are kept beside the scores (not in the app) for the review
-// sheets made by scripts/contact-sheets.py.
-const thumbFile = join(here, '.cache', 'thumbs.json');
-const thumbs = existsSync(thumbFile) ? JSON.parse(readFileSync(thumbFile, 'utf8')) : {};
-for (const w of works) if (w.thumb) thumbs[w.src[0]] = w.thumb;
-writeFileSync(thumbFile, JSON.stringify(thumbs));
-
-// Works rejected by eye (scripts/rejects.json: { "<first image URL>": "reason" }).
-const rejectFile = join(here, 'rejects.json');
-const rejects = existsSync(rejectFile) ? JSON.parse(readFileSync(rejectFile, 'utf8')) : {};
-let rejected = 0;
+// Review by eye: scripts/review.json maps a work's first image URL to a
+// verdict, "<code>: reason". Nothing is thrown away: works are labelled, so
+// the app can offer a curated selection by default and everything on request.
+//   U              unsuitable for a family room   -> "mature" (m), its own switch
+//   any other code (N not really a picture, R poor reproduction, S space junk,
+//                   C bad 16:9 crop, D dull as wall art) -> second tier (t: 2)
+const reviewFile = join(here, 'review.json');
+const review = existsSync(reviewFile) ? JSON.parse(readFileSync(reviewFile, 'utf8')) : {};
+const tally = { mature: 0, secondByEye: 0, secondByScore: 0 };
 
 const kept = [];
-const dropped = {};
 for (const w of works) {
-  const s = w.fresh ? scores[w.thumb || w.src[w.src.length - 1]] : null; // older works were vetted already
+  const s = scores[thumbOf(w)];
   delete w.thumb; // build-time only; keeps the bundled file small
   delete w.fresh;
-  if (rejects[w.src[0]]) { rejected++; continue; }
-  if (s && w.source !== 'nasa' && (s.l < MIN_LIGHT || s.c < MIN_COLOUR)) { // space is meant to be dark
-    dropped[w.source] = (dropped[w.source] || 0) + 1;
-    continue;
-  }
-  if (s) w.v = s.c; // colourfulness, used by the "Vivid only" switch
+  delete w.t; delete w.m;
+  const code = String(review[w.src[0]] || '').trim().charAt(0).toUpperCase();
+  if (code === 'U') { w.m = 1; tally.mature++; }
+  else if (code) { w.t = 2; tally.secondByEye++; }
+  // Dark or monochrome works go to the second tier too. Space is meant to be
+  // dark and is often one colour, so NASA is exempt.
+  if (!w.t && s && w.source !== 'nasa' && (s.l < MIN_LIGHT || s.s < MIN_VARIETY)) { w.t = 2; tally.secondByScore++; }
+  if (s) w.v = Math.round(s.s); // colour variety, used by the "Vivid only" switch
   kept.push(w);
 }
+const curated = kept.filter((w) => !w.t && !w.m).length;
 console.log(`unscored (thumbnail unavailable): ${kept.filter((w) => w.v == null).length}`);
-console.log(`rejected by review: ${rejected}`);
-console.log('dropped as too dark or colourless: ' + (Object.entries(dropped).map(([k, n]) => `${k} ${n}`).join(', ') || 'none'));
+console.log(`curated: ${curated};  second tier: ${tally.secondByEye} by eye + ${tally.secondByScore} dark or monochrome;  mature: ${tally.mature}`);
 
 const liveSources = sources.filter((s) => kept.some((w) => w.source === s.id));
 writeFileSync(out, JSON.stringify({ sources: liveSources, works: kept }));

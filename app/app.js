@@ -37,7 +37,7 @@
   var MAX_CROP = Math.min(0.9, Math.max(0, Number(cfg.maxCrop)));
   var LOAD_TIMEOUT_MS = 45000;
   var PREFS_KEY = 'artframe.prefs.v1';
-  var VIVID_MIN = 32;       // colourfulness score a work needs for "Vivid only"
+  var VIVID_MIN = 25;       // colour variety a work needs for "Vivid only"
   var Gen = window.ArtFrameGenerative || null; // code-drawn art (generative.js)
 
   var $ = function (id) { return document.getElementById(id); };
@@ -132,6 +132,7 @@
     try { p = JSON.parse(localStorage.getItem(PREFS_KEY) || 'null'); } catch (e) { /* no storage */ }
     p = p || {};
     return { cats: p.cats || {}, sources: p.sources || {}, photos: p.photos, frame: p.frame, vivid: p.vivid, gen: p.gen,
+             curated: p.curated, mature: p.mature,
              hidden: p.hidden || {}, favs: p.favs || {}, favOnly: !!p.favOnly, set: p.set || {}, seenHint: !!p.seenHint };
   }
 
@@ -145,6 +146,9 @@
   function catOn(id) { return id in prefs.cats ? prefs.cats[id] : listed(cfg.categories, id); }
   function sourceOn(id) { return id in prefs.sources ? prefs.sources[id] : listed(cfg.sources, id); }
   function vividOn() { return typeof prefs.vivid === 'boolean' ? prefs.vivid : !!cfg.vividOnly; }
+  // Curated: only the works picked as strong wall art. Off shows everything.
+  function curatedOn() { return typeof prefs.curated === 'boolean' ? prefs.curated : cfg.curatedOnly !== false; }
+  function matureOn() { return typeof prefs.mature === 'boolean' ? prefs.mature : !!cfg.matureThemes; }
   function genOn() { return !!Gen && (typeof prefs.gen === 'boolean' ? prefs.gen : cfg.generative !== false); }
   function photosOn() { return typeof prefs.photos === 'boolean' ? prefs.photos : cfg.myPhotos !== false; }
 
@@ -273,6 +277,8 @@
           return {
             ar: w.ar,
             v: w.v,
+            tier: w.t || 1,
+            mature: !!w.m,
             urls: w.src,
             title: w.title || '',
             sub: [w.sub, labels[w.source]].filter(Boolean).join('  ·  '),
@@ -296,14 +302,17 @@
     if (prefs.favOnly && favKeys.length) {
       return favKeys.map(function (k) {
         var f = prefs.favs[k];
-        return f.g ? { gen: true, fixed: f.g, title: f.t || '', sub: f.s || '' }
-                   : { urls: f.u, title: f.t || '', sub: f.s || '', cats: f.c || [], source: f.o };
-      });
+        if (f.g) return { gen: true, fixed: f.g, title: f.t || '', sub: f.s || '' };
+        if (f.k) return localItems.filter(function (p) { return p.key === f.k; })[0] || null; // one of the owner's photos
+        return { urls: f.u, title: f.t || '', sub: f.s || '', cats: f.c || [], source: f.o };
+      }).filter(Boolean);
     }
-    var items = photosOn() ? localItems.slice() : [];
+    var items = photosOn() ? localItems.filter(function (p) { return !prefs.hidden[idOf(p)]; }) : [];
     artItems.forEach(function (w) {
       if (prefs.hidden[w.urls[0]]) return; // thumbs-downed with the remote
       if (!sourceOn(w.source) || !w.cats.some(catOn)) return;
+      if (w.tier > 1 && curatedOn()) return;
+      if (w.mature && !matureOn()) return;
       // Leave out works too far from the window's shape to crop well.
       if (w.ar && cropLoss(w.ar) > MAX_CROP) return;
       if (vividOn() && typeof w.v === 'number' && w.v < VIVID_MIN) return;
@@ -483,16 +492,20 @@
   function buildRows() {
     var rows = [];
     var counts = {};
+    var allowed = function (w) { return !(w.tier > 1 && curatedOn()) && !(w.mature && !matureOn()); };
     artItems.forEach(function (w) {
-      if (!sourceOn(w.source)) return;
+      if (!sourceOn(w.source) || !allowed(w)) return;
       w.cats.forEach(function (c) { counts[c] = (counts[c] || 0) + 1; });
     });
+    if (localItems.length || tvPhotos) rows.push({ heading: 'Yours' });
     if (localItems.length) {
-      rows.push({ heading: 'Yours' });
       rows.push({
         label: 'My photos', count: localItems.length, on: photosOn(),
         toggle: function () { prefs.photos = !photosOn(); }
       });
+    }
+    if (tvPhotos) {
+      rows.push({ label: 'Add photos from your phone', count: '', plain: true, soft: true, toggle: function () { closeMenu(); openPair(); } });
     }
     rows.push({ heading: 'Show' });
     var favCount = Object.keys(prefs.favs).length;
@@ -500,6 +513,19 @@
       rows.push({
         label: 'Favourites only', count: favCount, on: prefs.favOnly,
         toggle: function () { prefs.favOnly = !prefs.favOnly; }
+      });
+    }
+    if (artItems.some(function (w) { return w.tier > 1; })) {
+      rows.push({
+        label: 'Best picks only', count: artItems.filter(function (w) { return w.tier === 1 && !w.mature; }).length, on: curatedOn(),
+        toggle: function () { prefs.curated = !curatedOn(); }
+      });
+    }
+    var matureCount = artItems.filter(function (w) { return w.mature; }).length;
+    if (matureCount) {
+      rows.push({
+        label: 'Mature themes', count: matureCount, on: matureOn(),
+        toggle: function () { prefs.mature = !matureOn(); }
       });
     }
     rows.push({
@@ -525,7 +551,7 @@
       sources.forEach(function (s) {
         rows.push({
           label: s.label,
-          count: artItems.filter(function (w) { return w.source === s.id; }).length,
+          count: artItems.filter(function (w) { return w.source === s.id && allowed(w); }).length,
           on: sourceOn(s.id),
           toggle: function () { prefs.sources[s.id] = !sourceOn(s.id); }
         });
@@ -714,7 +740,7 @@
       return;
     }
     hideArmed = null;
-    prefs.hidden[item.urls[0]] = 1;
+    prefs.hidden[idOf(item)] = 1;
     writePrefs();
     playlist.splice(position, 1);
     position--;
@@ -724,9 +750,12 @@
 
   // ---------- favourites (press Up) ----------
 
+  // What a picture is known by in favourites and the hidden list. The
+  // owner's photos have a stable key, since their addresses can change.
+  function idOf(item) { return item.key || item.urls[0]; }
   function favKey(item) {
     if (item.gen) return item.made ? 'gen:' + item.made.join(':') : null;
-    return item.urls[0];
+    return idOf(item);
   }
 
   function toggleFavourite() {
@@ -739,7 +768,7 @@
     } else {
       prefs.favs[key] = item.gen
         ? { g: item.made, t: item.title, s: item.sub }
-        : { u: item.urls, t: item.title, s: item.sub, c: item.cats, o: item.source };
+        : (item.key ? { k: item.key } : { u: item.urls, t: item.title, s: item.sub, c: item.cats, o: item.source });
       notice('\u2665  Saved to favourites', item.title);
     }
     writePrefs();
@@ -777,11 +806,19 @@
       var base = order[i].replace(/\/+$/, '');
       return fetchJson(base + '/photos.json', 5000).then(function (body) {
         photoBase = order[i];
-        if (body.version === photoVersion) return false;
-        photoVersion = body.version;
-        livePhotos = (body.photos || []).map(function (p) {
-          return { urls: [base + p.src], title: p.title || '', sub: '', ar: p.ar };
+        var fresh = (body.photos || []).map(function (p) {
+          return { key: p.key || p.src, urls: [/^https?:/.test(p.src) ? p.src : base + p.src], title: p.title || '', sub: '', ar: p.ar };
         });
+        if (body.version === photoVersion) {
+          // Same pictures. Album links can expire, so keep their addresses
+          // current without disturbing the rotation.
+          var byKey = {};
+          fresh.forEach(function (f) { byKey[f.key] = f; });
+          livePhotos.forEach(function (old) { if (byKey[old.key]) old.urls = byKey[old.key].urls; });
+          return false;
+        }
+        photoVersion = body.version;
+        livePhotos = fresh;
         localItems = bundledPhotos.concat(livePhotos);
         return true;
       }, function () { return attempt(i + 1); });
@@ -819,6 +856,65 @@
     });
   }
 
+  // ---------- photos kept on the TV, added from a phone ----------
+  // The app's background service (service/photos.js) runs a small web server
+  // on the home network while the app is open. A phone reaches it through
+  // the QR code on the "Add your photos" screen.
+  var tvPhotos = null;   // {port, urls, count} once the service has answered
+  var photoBridge = null;
+  var pairPoll = null;
+
+  function startTvPhotos() {
+    return new Promise(function (resolve) {
+      if (!window.PalmServiceBridge) { resolve(null); return; }
+      var guard = setTimeout(function () { resolve(null); }, 15000);
+      try {
+        photoBridge = new window.PalmServiceBridge(); // kept: the subscription holds the server open
+        photoBridge.onservicecallback = function (text) {
+          clearTimeout(guard);
+          var r = null;
+          try { r = JSON.parse(text); } catch (e) { /* ignored */ }
+          if (r && r.returnValue && r.port) {
+            tvPhotos = r;
+            var local = 'http://127.0.0.1:' + r.port;
+            if (photoServers.indexOf(local) < 0) photoServers.unshift(local);
+          }
+          logEvent('photos', r ? (r.returnValue ? r.count + ' on tv' : r.errorText) : 'no answer');
+          resolve(tvPhotos);
+        };
+        photoBridge.call('luna://com.freesaver.app.service/serve', JSON.stringify({ subscribe: true }));
+      } catch (e) { clearTimeout(guard); resolve(null); }
+    });
+  }
+
+  function openPair() {
+    if (!tvPhotos || !tvPhotos.urls || !tvPhotos.urls.length) {
+      notice('The TV is not on a network', 'Connect it to Wi-Fi to add photos from a phone');
+      return;
+    }
+    var url = tvPhotos.urls[0];
+    $('pairUrl').textContent = url;
+    $('pairCount').textContent = '';
+    if (window.FreeSaverQR) {
+      try { window.FreeSaverQR.draw($('pairCode'), url, { size: 360, level: 'M' }); } catch (e) { logEvent('qr', e.message); }
+    }
+    $('pair').classList.add('open');
+    var before = livePhotos.length;
+    pairPoll = setInterval(function () {
+      refreshLivePhotos().then(function (changed) {
+        if (changed) photosChanged = true;
+        var added = livePhotos.length - before;
+        $('pairCount').textContent = livePhotos.length ? livePhotos.length + ' of your photos on this TV' + (added > 0 ? '  (+' + added + ' just now)' : '') : '';
+      });
+    }, 4000);
+  }
+
+  function closePair() {
+    $('pair').classList.remove('open');
+    clearInterval(pairPoll);
+    if (photosChanged) { photosChanged = false; restart(); } // show what was just added
+  }
+
   // ---------- remote control ----------
 
   var KEY = { LEFT: 37, UP: 38, RIGHT: 39, DOWN: 40, OK: 13, BACK: 461, ESC: 27 };
@@ -826,6 +922,7 @@
   document.addEventListener('keydown', function (e) {
     var k = e.keyCode;
     if ($('hint').classList.contains('open')) { hideHint(); e.preventDefault(); return; }
+    if ($('pair').classList.contains('open')) { closePair(); e.preventDefault(); return; }
     if (menu.open) {
       if (k === KEY.UP) moveFocus(-1);
       else if (k === KEY.DOWN) moveFocus(1);
@@ -870,17 +967,27 @@
     $('menuTitle').appendChild(v);
   }).catch(function () {});
 
-  // Do not hold the first picture up for a computer that may be asleep.
-  var live = Promise.race([refreshLivePhotos(), new Promise(function (r) { setTimeout(function () { r(false); }, 3000); })]);
+  $('pair').addEventListener('click', closePair);
+
+  // The owner's photos: ask the TV's own photo service first. Do not hold the
+  // first picture up for long if it is slow to answer.
+  var booted = false;
+  var live = Promise.race([
+    startTvPhotos().then(refreshLivePhotos).then(function (changed) {
+      if (changed && booted) photosChanged = true; // answered late: pick them up at the next change
+      return changed;
+    }),
+    new Promise(function (r) { setTimeout(function () { r(false); }, 4000); })
+  ]);
   Promise.all([loadLocal(), loadArt(), live]).then(function (loaded) {
     bundledPhotos = loaded[0];
     localItems = bundledPhotos.concat(livePhotos);
     artItems = loaded[1];
+    booted = true;
     restart();
   });
-  if (photoServers.length) {
-    setInterval(function () {
-      refreshLivePhotos().then(function (changed) { if (changed) photosChanged = true; });
-    }, 5 * 60000);
-  }
+  setInterval(function () {
+    if (!photoServers.length) return;
+    refreshLivePhotos().then(function (changed) { if (changed) photosChanged = true; });
+  }, 5 * 60000);
 })();

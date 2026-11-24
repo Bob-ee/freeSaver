@@ -72,3 +72,46 @@ service.register('devmode', function (message) {
     check(!err && !!body && body.result === 'success');
   });
 });
+
+// ---------- the owner's photos ----------
+// serve {subscribe: true}: starts the photo server (photos.js) and keeps
+// this service alive for as long as the app stays subscribed, i.e. while
+// freeSaver is open. Replies with the addresses a phone can use.
+var photos = require('./photos');
+var keepAlive = null;
+var watchers = 0;
+
+function holdOpen() {
+  if (keepAlive || !service.activityManager) return;
+  service.activityManager.create('freesaver-photos', function (activity) { keepAlive = activity; });
+}
+function letGo() {
+  if (watchers > 0) return;
+  photos.stop();
+  if (keepAlive && service.activityManager) service.activityManager.complete(keepAlive, function () {});
+  keepAlive = null;
+}
+
+var serve = service.register('serve', function (message) {
+  photos.start(function (err, info) {
+    if (err) {
+      message.respond({ returnValue: false, errorText: err.code === 'EADDRINUSE' ? 'Port ' + 8377 + ' is in use on the TV' : String(err.message || err) });
+      return;
+    }
+    if (message.isSubscription) { watchers++; holdOpen(); }
+    info.returnValue = true;
+    info.subscribed = !!message.isSubscription;
+    message.respond(info);
+  });
+});
+serve.on('cancel', function () { watchers = Math.max(0, watchers - 1); letGo(); });
+
+// newlink: every QR code and link handed out so far stops working.
+service.register('newlink', function (message) {
+  photos.resetToken();
+  photos.start(function (err, info) {
+    if (err) { message.respond({ returnValue: false, errorText: String(err.message || err) }); return; }
+    info.returnValue = true;
+    message.respond(info);
+  });
+});

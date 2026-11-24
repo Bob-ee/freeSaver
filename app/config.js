@@ -12,6 +12,13 @@ window.ARTFRAME_CONFIG = {
   // 'all', or a list of source ids (see scripts/sources/), e.g. ['met', 'nasa'].
   sources: 'all',
 
+  // Show only the works picked as strong wall art. Turn off to see
+  // everything in the catalogue: old photographs, sketches, darker works.
+  curatedOnly: true,
+
+  // Include works with violent or explicit subjects.
+  matureThemes: false,
+
   // Only show the most colourful works from the catalogue.
   vividOnly: false,
 

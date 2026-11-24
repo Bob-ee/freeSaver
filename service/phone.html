@@ -1,0 +1,439 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f6f2ea" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#16140f" media="(prefers-color-scheme: dark)">
+<title>freeSaver</title>
+<link rel="icon" href="data:,">
+<style>
+:root{--bg:#f6f2ea;--surface:#fffdf8;--ink:#2a2620;--muted:#645d50;--line:#e2dacb;--accent:#c9a45c;--on-accent:#2a2013;--accent-ink:#7a5a17;--soft:#efe8d8;--bad:#a63a2a;--bad-bg:#f8e7e2;--ok:#4d6b3a;--shadow:0 1px 2px rgba(60,45,20,.08),0 6px 20px rgba(60,45,20,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#16140f;--surface:#211e17;--ink:#f1ebdf;--muted:#b3aa97;--line:#393329;--accent-ink:#dcc088;--soft:#2b2720;--bad:#f2a090;--bad-bg:#3a2420;--ok:#a9c98f;--shadow:none}}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;padding:env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);overflow-x:hidden}
+main{max-width:640px;margin:0 auto;padding:16px 16px 40px}
+header{padding:20px 0 12px}
+.brand{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+h1{margin:0;font-size:1.75rem;letter-spacing:-.01em;font-weight:650}
+h1 span{color:var(--accent-ink)}
+h2{margin:0;font-size:1.15rem;font-weight:650}
+.lede{margin:6px 0 0;color:var(--muted)}
+.pill{display:inline-flex;align-items:center;gap:8px;min-height:32px;padding:4px 12px;border-radius:99px;background:var(--soft);font-size:.875rem;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--muted);flex:none}
+.pill.on .dot{background:var(--ok)}.pill.off{background:var(--bad-bg);color:var(--bad)}.pill.off .dot{background:var(--bad)}
+.pill.wait .dot{animation:pulse 1.2s ease-in-out infinite}
+@keyframes pulse{50%{opacity:.25}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:16px;box-shadow:var(--shadow)}
+.card>h2+p,.sub{margin:4px 0 0;color:var(--muted);font-size:.9375rem}
+.banner{margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--bad-bg);color:var(--bad);display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.banner[hidden]{display:none}
+button,.btn{font:inherit;min-height:44px;padding:8px 16px;border-radius:12px;border:1px solid var(--line);background:var(--surface);color:var(--ink);cursor:pointer;touch-action:manipulation;-webkit-tap-highlight-color:transparent}
+button:hover{border-color:var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent);font-weight:650}
+button.big{width:100%;min-height:60px;font-size:1.125rem;margin-top:14px}
+button.danger{color:var(--bad);border-color:currentColor}
+button.link{border:0;background:none;min-height:44px;padding:8px;color:var(--accent-ink);text-decoration:underline}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.status{min-height:92px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--soft);font-size:.9375rem}
+.status p{margin:0}.status .hint{color:var(--muted)}
+.bar{height:10px;border-radius:99px;background:var(--line);overflow:hidden;margin:10px 0}
+.bar i{display:block;height:100%;width:0;background:var(--accent);transition:width .25s}
+.bar.ind i{width:35%;animation:slide 1.3s ease-in-out infinite}
+@keyframes slide{0%{margin-left:-35%}100%{margin-left:100%}}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row.sp{justify-content:space-between}
+.fails{margin:8px 0 0;padding:0 0 0 18px;max-height:9em;overflow:auto;color:var(--bad)}
+.fails li{overflow-wrap:anywhere}
+.toolbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;min-height:48px;margin-top:10px}
+.toolbar:empty{display:none}
+.toolbar .grow{flex:1;min-width:0;color:var(--muted);font-size:.9375rem}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:6px}
+.tile{position:relative;padding:0;min-height:0;aspect-ratio:1;border-radius:10px;overflow:hidden;background:var(--soft);border:0}
+.tile img{width:100%;height:100%;object-fit:cover;display:block}
+.tile .chk{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;border:2px solid #fff;background:rgba(0,0,0,.25);display:grid;place-items:center;color:transparent;font-size:15px;font-weight:700;line-height:1}
+.tile[aria-pressed=true]{outline:3px solid var(--accent);outline-offset:-3px}
+.tile[aria-pressed=true] img{opacity:.7}
+.tile[aria-pressed=true] .chk{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.empty{padding:16px 8px 8px;text-align:center;color:var(--muted)}
+.note{margin:10px 0 0;font-size:.9375rem;color:var(--muted)}.note.warn{color:var(--bad)}
+form.add{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+input[type=url],input[type=text]{flex:1 1 100%;min-width:0;min-height:48px;padding:8px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink);font:inherit;font-size:16px}
+label.l{display:block;margin-top:12px;font-weight:600;font-size:.9375rem}
+details{margin-top:10px;border-top:1px solid var(--line)}
+summary{min-height:44px;display:flex;align-items:center;cursor:pointer;font-size:.9375rem;color:var(--accent-ink)}
+details p{margin:0 0 10px;color:var(--muted);font-size:.9375rem}
+.albums{list-style:none;margin:12px 0 0;padding:0}
+.albums li{padding:12px 0;border-top:1px solid var(--line)}
+.albums .t{font-weight:600;overflow-wrap:anywhere}
+.albums .m{color:var(--muted);font-size:.875rem}
+.albums .err{margin:6px 0 0;padding:8px 10px;border-radius:8px;background:var(--bad-bg);color:var(--bad);font-size:.9375rem}
+.albums .row{margin-top:8px}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;background:var(--soft);color:var(--accent-ink);font-size:.8125rem;margin-right:6px;vertical-align:1px}
+.privacy p{margin:8px 0 0;color:var(--muted);font-size:.9375rem}
+#toast{position:fixed;left:50%;bottom:calc(16px + env(safe-area-inset-bottom));transform:translate(-50%,20px);max-width:min(92vw,420px);padding:12px 16px;border-radius:12px;background:var(--ink);color:var(--bg);opacity:0;pointer-events:none;transition:.25s;z-index:9}
+#toast.show{opacity:1;transform:translate(-50%,0)}
+dialog{border:1px solid var(--line);border-radius:16px;background:var(--surface);color:var(--ink);max-width:min(92vw,380px);padding:20px}
+dialog::backdrop{background:rgba(0,0,0,.5)}
+dialog h2{margin-bottom:6px}dialog p{margin:0 0 16px;color:var(--muted)}
+dialog .row{justify-content:flex-end}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+<header>
+ <div class="brand"><h1>free<span>Saver</span></h1><div id="pill" class="pill wait" role="status"><i class="dot"></i><span>Looking for your TV…</span></div></div>
+ <p class="lede">Photos you add here show up on your TV, mixed in with the art.</p>
+ <div id="offline" class="banner" hidden><span id="offmsg"></span><button id="retry">Try again</button></div>
+</header>
+
+<section class="card" aria-labelledby="h-add">
+ <h2 id="h-add">Add photos</h2>
+ <p>Pick pictures from your phone. They are made TV-sized for you.</p>
+ <input id="file" class="sr" type="file" accept="image/*" multiple tabindex="-1" aria-label="Choose photos">
+ <button id="addbtn" class="primary big" type="button">Add photos</button>
+ <div id="status" class="status" aria-live="polite" aria-atomic="false"></div>
+</section>
+
+<section class="card" aria-labelledby="h-photos">
+ <div class="row sp"><h2 id="h-photos">Your photos on the TV</h2><span id="pcount" class="sub" style="margin:0"></span></div>
+ <p id="space" class="sub"></p>
+ <div class="toolbar" id="toolbar"></div>
+ <div id="grid" class="grid"></div>
+ <p id="pempty" class="empty" hidden>No photos yet. Tap “Add photos” above to send your first ones.</p>
+</section>
+
+<section class="card" aria-labelledby="h-alb">
+ <h2 id="h-alb">Shared albums</h2>
+ <p>The TV can show an album you have shared online, and keeps it up to date.</p>
+ <form class="add" id="albform" novalidate>
+  <label class="sr" for="alburl">Shared album link</label>
+  <input id="alburl" type="url" inputmode="url" autocapitalize="off" autocorrect="off" spellcheck="false" placeholder="Paste a shared album link">
+  <button type="button" id="pastebtn" hidden>Paste</button>
+  <button type="submit" id="albadd" class="primary">Add album</button>
+ </form>
+ <div id="albstat" aria-live="polite"></div>
+ <details><summary>Immich: how to get the link</summary><p>Open the album in Immich, tap Share, choose “Create link” and copy it.</p></details>
+ <details><summary>Google Photos: how to get the link</summary><p>Open the album, tap Share, choose “Create link” and copy it. Only albums shared by link work.</p></details>
+ <details><summary>iCloud Shared Albums: how to get the link</summary><p>In Photos, open the Shared Album, tap the people icon, turn on “Public Website”, then “Share Link” and copy it.</p></details>
+ <ul id="albums" class="albums"></ul>
+ <p id="aempty" class="empty" hidden>No albums linked yet.</p>
+</section>
+
+<section class="card privacy" aria-labelledby="h-priv">
+ <h2 id="h-priv">How it works and privacy</h2>
+ <p>Photos go straight from your phone to the TV over your home Wi-Fi and are stored on the TV. Nothing is uploaded to the internet. The TV reads album links itself. There is no account and nothing to install.</p>
+</section>
+</main>
+<div id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg"><h2 id="dt"></h2><p id="dp"></p><div class="row"><button id="dno">Cancel</button><button id="dyes" class="danger"></button></div></dialog>
+<script>
+(function(){
+'use strict';
+var UNREACH="Can't reach the TV. Is it on, and is your phone on the same Wi-Fi?";
+var MAXSIDE=3840,THUMB=480;
+var ORIENT_TEST="/9j/4AAQSkZJRgABAQAAAQABAAD/4QAiRXhpZgAATU0AKgAAAAgAAQESAAMAAAABAAYAAAAAAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wAARCAABAAIDASIAAhEBAxEB/8QAHwAAAQUBAQEBAQEAAAAAAAAAAAECAwQFBgcICQoL/8QAtRAAAgEDAwIEAwUFBAQAAAF9AQIDAAQRBRIhMUEGE1FhByJxFDKBkaEII0KxwRVS0fAkM2JyggkKFhcYGRolJicoKSo0NTY3ODk6Q0RFRkdISUpTVFVWV1hZWmNkZWZnaGlqc3R1dnd4eXqDhIWGh4iJipKTlJWWl5iZmqKjpKWmp6ipqrKztLW2t7i5usLDxMXGx8jJytLT1NXW19jZ2uHi4+Tl5ufo6erx8vP09fb3+Pn6/8QAHwEAAwEBAQEBAQEBAQAAAAAAAAECAwQFBgcICQoL/8QAtREAAgECBAQDBAcFBAQAAQJ3AAECAxEEBSExBhJBUQdhcRMiMoEIFEKRobHBCSMzUvAVYnLRChYkNOEl8RcYGRomJygpKjU2Nzg5OkNERUZHSElKU1RVVldYWVpjZGVmZ2hpanN0dXZ3eHl6goOEhYaHiImKkpOUlZaXmJmaoqOkpaanqKmqsrO0tba3uLm6wsPExcbHyMnK0tPU1dbX2Nna4uPk5ebn6Onq8vP09fb3+Pn6/9oADAMBAAIRAxEAPwCOiiivmj7A/9k=";
+var $=function(s){return document.querySelector(s)};
+function h(tag,attrs){var e=document.createElement(tag);if(attrs)for(var k in attrs){var v=attrs[k];if(v==null||v===false)continue;if(k==='text')e.textContent=v;else if(k.slice(0,2)==='on')e.addEventListener(k.slice(2),v);else e.setAttribute(k,v===true?'':v)}
+ for(var i=2;i<arguments.length;i++){var c=arguments[i];if(Array.isArray(c))c.forEach(function(x){e.append(x)});else if(c!=null)e.append(c)}return e}
+function sleep(ms){return new Promise(function(r){setTimeout(r,ms)})}
+function plural(n,w){return n+' '+w+(n===1?'':'s')}
+function fmtBytes(b){if(b<1e6)return Math.max(1,Math.round(b/1e3))+' KB';if(b<1e9)return (b/1e6).toFixed(b<1e7?1:0)+' MB';return (b/1e9).toFixed(1)+' GB'}
+function ago(t){if(!t)return 'not checked yet';var s=Math.max(0,(Date.now()-t)/1000);if(s<60)return 'checked just now';if(s<3600)return 'checked '+Math.floor(s/60)+' min ago';if(s<86400)return 'checked '+plural(Math.floor(s/3600),'hour')+' ago';return 'checked '+new Date(t).toLocaleDateString()}
+var toastT;function toast(m){var t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(function(){t.classList.remove('show')},4200)}
+
+/* ---------- API ---------- */
+function ApiError(msg,status,net){this.message=msg;this.status=status||0;this.net=!!net}
+ApiError.prototype=Object.create(Error.prototype);
+function api(path,o){
+ o=o||{};var ctl=new AbortController(),timed=false;
+ var t=setTimeout(function(){timed=true;ctl.abort()},o.timeout||15000);
+ if(o.signal){if(o.signal.aborted)ctl.abort();else o.signal.addEventListener('abort',function(){ctl.abort()},{once:true})}
+ var hd=o.headers||{},body=o.body;
+ if(o.json!==undefined){body=JSON.stringify(o.json);hd=Object.assign({'Content-Type':'application/json'},hd)}
+ return fetch(path,{method:o.method||'GET',headers:hd,body:body,signal:ctl.signal,cache:'no-store'}).then(function(res){
+  return res.text().then(function(txt){
+   var d=null;try{d=txt?JSON.parse(txt):null}catch(e){}
+   if(!res.ok){if(d&&d.error)throw new ApiError(d.error,res.status);throw new ApiError(UNREACH,res.status,true)}
+   return d||{};
+  });
+ }).catch(function(e){
+  if(e instanceof ApiError)throw e;
+  if(o.signal&&o.signal.aborted&&!timed){var c=new ApiError('Cancelled');c.cancelled=true;throw c}
+  throw new ApiError(UNREACH,0,true);
+ }).then(function(v){clearTimeout(t);return v},function(e){clearTimeout(t);throw e});
+}
+
+/* ---------- state + render ---------- */
+var S=null,selected=new Set(),busyAlb=new Map(),sigP='',sigA='',polling=false,lastOkAt=0;
+function setPill(kind,text){var p=$('#pill');p.className='pill '+kind;p.lastChild.textContent=text}
+function refresh(){
+ if(polling)return polling;
+ polling=api('./state',{timeout:8000}).then(function(s){
+  S=s;lastOkAt=Date.now();setPill('on','Connected to '+(s.tv||'your TV'));$('#offline').hidden=true;render();
+ },function(e){
+  setPill('off','TV not reachable');$('#offmsg').textContent=e.message;$('#offline').hidden=false;
+ }).then(function(){polling=false});
+ return polling;
+}
+var refreshSoonT;function refreshSoon(){clearTimeout(refreshSoonT);refreshSoonT=setTimeout(refresh,800)}
+
+function render(){renderPhotos();renderAlbums()}
+function renderPhotos(){
+ var ph=S.photos||[],total=ph.reduce(function(a,p){return a+(p.bytes||0)},0);
+ selected.forEach(function(id){if(!ph.some(function(p){return p.id===id}))selected.delete(id)});
+ $('#pcount').textContent=S.limitPhotos?ph.length+' of '+S.limitPhotos:plural(ph.length,'photo');
+ var free=S.freeBytes,txt=ph.length?plural(ph.length,'photo')+', '+fmtBytes(total)+' used. ':'';
+ if(typeof free==='number'){
+  txt+=fmtBytes(free)+' free on the TV';
+  var avg=ph.length?total/ph.length:2.5e6,room=Math.floor(free/Math.max(avg,5e5));
+  if(S.limitPhotos)room=Math.min(room,Math.max(0,S.limitPhotos-ph.length));
+  txt+=room>=1?', room for about '+room+' more.':'. It is full.';
+ }
+ $('#space').textContent=txt;
+ var sig=ph.map(function(p){return p.id}).join()+'|'+[...selected].join()+'|'+ (S.freeBytes<2e8)+Q.running;
+ var tb=$('#toolbar');
+ if(sig!==sigP){
+  sigP=sig;var g=$('#grid');g.textContent='';
+  ph.forEach(function(p,i){
+   var on=selected.has(p.id);
+   g.append(h('button',{type:'button',class:'tile','aria-pressed':on,'aria-label':'Photo '+(i+1)+(on?', selected':''),onclick:function(){toggle(p.id)}},
+    h('img',{src:p.thumb,loading:'lazy',decoding:'async',alt:'',width:p.width&&p.height?undefined:undefined}),h('span',{class:'chk','aria-hidden':'true',text:'✓'})));
+  });
+  $('#pempty').hidden=ph.length>0;
+  tb.textContent='';
+  if(ph.length){
+   var n=selected.size;
+   tb.append(h('span',{class:'grow',text:n?n+' selected':'Tap photos to select them'}));
+   if(n){tb.append(h('button',{type:'button',class:'danger',onclick:delSelected},'Delete '+n),h('button',{type:'button',onclick:function(){selected.clear();sigP='';renderPhotos()}},'Clear'))}
+   else tb.append(h('button',{type:'button',onclick:function(){ph.forEach(function(p){selected.add(p.id)});sigP='';renderPhotos()}},'Select all'),h('button',{type:'button',class:'danger',onclick:delAll},'Delete all'));
+  }
+  if(S.freeBytes<2e8)tb.append(h('p',{class:'note warn',text:'The TV is almost out of space. Delete some photos to add more.'}));
+ }
+}
+function toggle(id){selected.has(id)?selected.delete(id):selected.add(id);sigP='';renderPhotos()}
+
+var dlg=$('#dlg');
+function confirmBox(title,text,ok){
+ if(!dlg.showModal)return Promise.resolve(window.confirm(title+'\n'+text));
+ $('#dt').textContent=title;$('#dp').textContent=text;$('#dyes').textContent=ok;
+ return new Promise(function(res){
+  function done(v){dlg.removeEventListener('close',onc);$('#dyes').onclick=$('#dno').onclick=null;if(dlg.open)dlg.close();res(v)}
+  function onc(){done(false)}
+  dlg.addEventListener('close',onc);
+  $('#dyes').onclick=function(){done(true)};$('#dno').onclick=function(){done(false)};
+  dlg.showModal();$('#dno').focus();
+ });
+}
+var delBusy=false;
+async function deleteIds(ids){
+ if(delBusy)return;delBusy=true;var fail=0,msg='';
+ setPhotoBusy(true);
+ for(var i=0;i<ids.length;i++){
+  try{await api('./photo/'+encodeURIComponent(ids[i]),{method:'DELETE'});selected.delete(ids[i])}catch(e){fail++;msg=e.message;if(e.net)break}
+ }
+ delBusy=false;setPhotoBusy(false);
+ toast(fail?'Could not delete everything. '+msg:plural(ids.length-fail,'photo')+' deleted.');
+ sigP='';await refresh();
+}
+function setPhotoBusy(b){$('#toolbar').querySelectorAll('button').forEach(function(x){x.disabled=b});$('#grid').style.opacity=b?.6:1}
+function delSelected(){var ids=[...selected];confirmBox('Delete '+plural(ids.length,'photo')+'?','They will be removed from the TV. This cannot be undone.','Delete').then(function(y){if(y)deleteIds(ids)})}
+function delAll(){var ids=S.photos.map(function(p){return p.id});confirmBox('Delete all '+plural(ids.length,'photo')+'?','Every photo you added will be removed from the TV. Linked albums stay. This cannot be undone.','Delete all').then(function(y){if(y)deleteIds(ids)})}
+
+/* ---------- albums ---------- */
+var KIND={immich:'Immich',google:'Google Photos',icloud:'iCloud'};
+function renderAlbums(){
+ var al=S.albums||[];
+ var sig=al.map(function(a){return [a.id,a.title,a.count,a.error,ago(a.checked),busyAlb.get(a.id)].join('~')}).join('|');
+ if(sig===sigA)return;sigA=sig;
+ var ul=$('#albums');ul.textContent='';$('#aempty').hidden=al.length>0;
+ al.forEach(function(a){
+  var b=busyAlb.get(a.id);
+  ul.append(h('li',null,
+   h('div',{class:'t'},h('span',{class:'tag',text:KIND[a.kind]||'Album'}),a.title||'Untitled album'),
+   h('div',{class:'m',text:plural(a.count||0,'photo')+' · '+ago(a.checked)}),
+   a.error?h('div',{class:'err',role:'alert',text:a.error}):null,
+   h('div',{class:'row'},
+    h('button',{type:'button',disabled:!!b,onclick:function(){refreshAlbum(a)}},b==='r'?'Checking…':'Refresh'),
+    h('button',{type:'button',class:'danger',disabled:!!b,onclick:function(){removeAlbum(a)}},b==='d'?'Removing…':'Remove'))));
+ });
+}
+function setAlb(id,v){v?busyAlb.set(id,v):busyAlb.delete(id);sigA='';if(S)renderAlbums()}
+function refreshAlbum(a){
+ setAlb(a.id,'r');
+ api('./albums/'+encodeURIComponent(a.id)+'/refresh',{method:'POST',timeout:60000}).then(function(r){
+  toast('“'+a.title+'” now has '+plural(r.count==null?a.count:r.count,'photo')+'.');
+ },function(e){toast(e.message)}).then(function(){setAlb(a.id,null);return refresh()});
+}
+function removeAlbum(a){
+ confirmBox('Remove “'+(a.title||'this album')+'”?','The TV will stop showing it. The album itself is not touched.','Remove').then(function(y){
+  if(!y)return;setAlb(a.id,'d');
+  api('./albums/'+encodeURIComponent(a.id),{method:'DELETE'}).then(function(){toast('Album removed.')},function(e){toast(e.message)}).then(function(){setAlb(a.id,null);return refresh()});
+ });
+}
+var albBusy=false;
+$('#albform').addEventListener('submit',function(ev){
+ ev.preventDefault();if(albBusy)return;
+ var url=$('#alburl').value.trim(),st=$('#albstat');
+ if(!url){st.textContent='';st.append(h('p',{class:'note warn',text:'Paste the album link first.'}));return}
+ albBusy=true;$('#albadd').disabled=true;$('#pastebtn').disabled=true;$('#albadd').textContent='Adding…';
+ st.textContent='';st.append(h('div',{class:'bar ind',role:'progressbar','aria-label':'Reading album'},h('i')),h('p',{class:'note',text:'The TV is reading the album. This can take up to 20 seconds.'}));
+ api('./albums',{method:'POST',json:{url:url},timeout:60000}).then(function(r){
+  st.textContent='';$('#alburl').value='';toast('Added “'+(r.title||'album')+'” ('+plural(r.count||0,'photo')+').');
+ },function(e){st.textContent='';st.append(h('p',{class:'note warn',role:'alert',text:e.message}))}).then(function(){
+  albBusy=false;$('#albadd').disabled=false;$('#pastebtn').disabled=false;$('#albadd').textContent='Add album';return refresh();
+ });
+});
+if(navigator.clipboard&&navigator.clipboard.readText){
+ $('#pastebtn').hidden=false;
+ $('#pastebtn').addEventListener('click',function(){
+  navigator.clipboard.readText().then(function(t){t=(t||'').trim();if(t){$('#alburl').value=t;$('#alburl').focus()}else toast('Nothing to paste. Copy the album link first.')},function(){toast('Could not read the clipboard. Paste into the box instead.')});
+ });
+}
+
+/* ---------- photo preparation ---------- */
+var PHOTO_RE=/\.(jpe?g|png|gif|webp|heic|heif|avif|bmp)$/i;
+function isPhoto(f){return (f.type&&f.type.indexOf('image/')===0)||(!f.type&&PHOTO_RE.test(f.name))}
+function loadImg(blob){return new Promise(function(res,rej){var u=URL.createObjectURL(blob),im=new Image();im.decoding='async';
+ im.onload=function(){res({src:im,w:im.naturalWidth,h:im.naturalHeight,close:function(){im.onload=im.onerror=null;im.src='';URL.revokeObjectURL(u)}})};
+ im.onerror=function(){URL.revokeObjectURL(u);rej(new Error('decode'))};im.src=u})}
+async function viaBitmap(blob){var b=await createImageBitmap(blob,{imageOrientation:'from-image'});return{src:b,w:b.width,h:b.height,close:function(){b.close&&b.close()}}}
+var decoder=null;
+/* Work out once which decoder applies EXIF orientation, using a 2x1 JPEG tagged "rotate 90" (should come out 1x2). */
+async function pickDecoder(){
+ if(decoder)return decoder;
+ var bin=atob(ORIENT_TEST),u8=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)u8[i]=bin.charCodeAt(i);
+ var blob=new Blob([u8],{type:'image/jpeg'}),order=[];
+ if(window.createImageBitmap)order.push(viaBitmap);order.push(loadImg);
+ for(var k=0;k<order.length;k++){try{var d=await order[k](blob),ok=d.w===1&&d.h===2;d.close();if(ok){decoder=order[k];return decoder}}catch(e){}}
+ decoder=window.createImageBitmap?viaBitmap:loadImg;return decoder;
+}
+async function decode(file){
+ var d=await pickDecoder();
+ try{return await d(file)}catch(e){if(d!==loadImg)return await loadImg(file);throw e}
+}
+function toBlob(c,q){return new Promise(function(res){c.toBlob(res,'image/jpeg',q)})}
+function mkCanvas(w,h){var c=document.createElement('canvas');c.width=w;c.height=h;return c}
+function release(c){c.width=c.height=0}
+async function prepare(file){
+ var d=await decode(file);
+ try{
+  var w=d.w,h=d.h;if(!w||!h)throw new Error('decode');
+  var k=Math.min(1,MAXSIDE/Math.max(w,h)),cw=Math.max(1,Math.round(w*k)),ch=Math.max(1,Math.round(h*k));
+  var c=mkCanvas(cw,ch),x=c.getContext('2d');
+  if(!x)throw new Error('canvas');
+  x.fillStyle='#fff';x.fillRect(0,0,cw,ch);x.imageSmoothingQuality='high';x.drawImage(d.src,0,0,cw,ch);
+  d.close();d=null;
+  var full=await toBlob(c,0.88);if(!full)throw new Error('encode');
+  /* thumbnail: halve repeatedly for a clean downscale */
+  var tk=Math.min(1,THUMB/Math.max(cw,ch)),tw=Math.max(1,Math.round(cw*tk)),th=Math.max(1,Math.round(ch*tk)),cur=c;
+  while(cur.width/2>tw){var nw=Math.ceil(cur.width/2),nh=Math.ceil(cur.height/2),n=mkCanvas(nw,nh),nx=n.getContext('2d');nx.imageSmoothingQuality='high';nx.drawImage(cur,0,0,nw,nh);release(cur);cur=n}
+  if(cur.width!==tw){var n2=mkCanvas(tw,th),n2x=n2.getContext('2d');n2x.imageSmoothingQuality='high';n2x.drawImage(cur,0,0,tw,th);release(cur);cur=n2}
+  var thumb=await toBlob(cur,0.8);release(cur);if(!thumb)throw new Error('encode');
+  return{full:full,thumb:thumb,w:cw,h:ch};
+ }finally{if(d)d.close()}
+}
+
+/* ---------- upload queue ---------- */
+var Q={running:false,cancelled:false,stop:null,ctl:null,total:0,done:0,ok:0,thumbMiss:0,failed:[],skipped:[],netFails:0},wake=null,prepChain=Promise.resolve();
+function withPrepLock(fn){var r=prepChain.then(fn,fn);prepChain=r.then(function(){},function(){});return r}
+function say(){ /* status panel */
+ var st=$('#status');st.textContent='';var a=[].slice.call(arguments);a.forEach(function(n){if(n)st.append(n)});
+}
+function idle(){say(h('p',{class:'hint',text:'Photos from your library or camera roll all work. Large ones are shrunk to TV size on your phone first.'}))}
+function showProgress(){
+ var n=Math.min(Q.done+1,Q.total),pct=Q.total?Math.round(Q.done/Q.total*100):0;
+ var st=$('#status');
+ if(!st.querySelector('.bar')){
+  st.textContent='';st.append(h('p',{id:'ptext',role:'status'}),h('div',{class:'bar',id:'pbar',role:'progressbar','aria-valuemin':'0','aria-valuemax':'100','aria-label':'Upload progress'},h('i')),h('div',{class:'row'},h('button',{type:'button',id:'cancelbtn',onclick:cancelUpload},'Cancel')));
+ }
+ $('#ptext').textContent=Q.cancelled?'Stopping…':'Sending '+n+' of '+Q.total;
+ $('#pbar').setAttribute('aria-valuenow',pct);$('#pbar').firstChild.style.width=Math.max(pct,4)+'%';
+ if(Q.cancelled)$('#cancelbtn').disabled=true;
+}
+function cancelUpload(){Q.cancelled=true;if(Q.ctl)Q.ctl.abort();showProgress()}
+async function getWake(){try{if(navigator.wakeLock&&!wake){wake=await navigator.wakeLock.request('screen');wake.addEventListener('release',function(){wake=null})}}catch(e){}}
+function dropWake(){try{if(wake)wake.release()}catch(e){}wake=null}
+document.addEventListener('visibilitychange',function(){if(Q.running&&document.visibilityState==='visible')getWake();if(document.visibilityState==='visible')refresh()});
+window.addEventListener('beforeunload',function(e){if(Q.running){e.preventDefault();e.returnValue='';return ''}});
+
+function startUpload(files){
+ var list=[],skipped=[];
+ files.forEach(function(f){isPhoto(f)?list.push(f):skipped.push(f.name+' (not a photo)')});
+ if(!list.length){finish(skipped,[],0);return}
+ runQueue(list,skipped);
+}
+async function runQueue(list,skipped){
+ Q.running=true;Q.cancelled=false;Q.stop=null;Q.ctl=new AbortController();Q.total=list.length;Q.done=0;Q.ok=0;Q.thumbMiss=0;Q.failed=[];Q.netFails=0;
+ $('#addbtn').disabled=true;getWake();showProgress();
+ var idx=0;
+ async function worker(){
+  while(!Q.cancelled&&!Q.stop){
+   var i=idx++;if(i>=list.length)return;var f=list[i];
+   try{await one(f)}catch(e){
+    if(e.cancelled)return;
+    var why=reason(e);Q.failed.push({file:f,why:why});
+    if(e.net){if(++Q.netFails>=3)Q.stop='Lost contact with the TV.'}else Q.netFails=0;
+    if(e.status===413||e.status===507)Q.stop=e.message;
+   }
+   Q.done++;showProgress();
+  }
+ }
+ await Promise.all([worker(),worker()]);
+ /* anything not attempted because we stopped early can be retried */
+ if(Q.stop)for(var j=idx;j<list.length;j++)Q.failed.push({file:list[j],why:'not sent'});
+ Q.running=false;dropWake();$('#addbtn').disabled=false;
+ finish(skipped,Q.failed,Q.ok,Q.cancelled,Q.stop);
+ await refresh();
+}
+function reason(e){
+ if(e instanceof ApiError)return e.message;
+ if(e.message==='decode')return "this browser can't read the photo";
+ return "couldn't prepare the photo";
+}
+async function one(f){
+ if(Q.cancelled)throw {cancelled:true};
+ var p=await withPrepLock(function(){return Q.cancelled?Promise.reject({cancelled:true}):prepare(f)});
+ var r=await api('./upload',{method:'POST',body:p.full,headers:{'Content-Type':'image/jpeg','X-Width':String(p.w),'X-Height':String(p.h)},timeout:180000,signal:Q.ctl.signal});
+ Q.netFails=0;Q.ok++;
+ var tOk=false;
+ for(var a=0;a<2&&!tOk;a++){try{await api('./thumb/'+encodeURIComponent(r.id),{method:'POST',body:p.thumb,headers:{'Content-Type':'image/jpeg'},timeout:30000,signal:Q.ctl.signal});tOk=true}catch(e){if(e.cancelled)break}}
+ if(!tOk)Q.thumbMiss++;
+ p.full=p.thumb=null;refreshSoon();
+}
+function finish(skipped,failed,ok,cancelled,stopMsg){
+ var parts=[];
+ var head=cancelled?'Cancelled. '+plural(ok,'photo')+' sent.':ok?plural(ok,'photo')+' sent to the TV.':'No photos were sent.';
+ parts.push(h('p',{role:'status'},h('strong',{text:head})));
+ if(stopMsg)parts.push(h('p',{class:'note warn',text:stopMsg.replace(/\.?$/,'. ')+'The rest were not sent.'}));
+ if(Q.thumbMiss)parts.push(h('p',{class:'note',text:plural(Q.thumbMiss,'photo')+' may show a blank preview here, but will still appear on the TV.'}));
+ var bad=failed.map(function(x){return x.file.name+' ('+x.why+')'}).concat(skipped);
+ if(bad.length){
+  parts.push(h('p',{class:'note warn',text:plural(bad.length,'photo')+' could not be added:'}));
+  parts.push(h('ul',{class:'fails'},bad.map(function(t){return h('li',{text:t})})));
+ }
+ var row=h('div',{class:'row'});
+ if(failed.length){row.append(h('button',{type:'button',class:'primary',onclick:function(){runQueue(failed.map(function(x){return x.file}),[])}},'Retry '+failed.length))}
+ row.append(h('button',{type:'button',onclick:idle},'Dismiss'));
+ parts.push(row);
+ say.apply(null,parts);
+}
+$('#addbtn').addEventListener('click',function(){if(!Q.running)$('#file').click()});
+$('#file').addEventListener('change',function(){
+ var fs=[].slice.call(this.files);this.value='';
+ if(fs.length&&!Q.running)startUpload(fs);
+});
+$('#retry').addEventListener('click',function(){this.disabled=true;var b=this;refresh().then(function(){b.disabled=false})});
+
+idle();
+refresh();
+setInterval(function(){if(document.visibilityState==='visible'&&!Q.running)refresh()},15000);
+})();
+</script>
+</body>
+</html>

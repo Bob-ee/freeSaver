@@ -12,8 +12,8 @@ shows it. Add works you do not want to scripts/rejects.json.
 import io
 import json
 import os
+import subprocess
 import sys
-import urllib.request
 from concurrent.futures import ThreadPoolExecutor
 
 from PIL import Image, ImageDraw, ImageFont
@@ -34,8 +34,9 @@ def fetch(job):
     if os.path.exists(path):
         return
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': UA})
-        data = urllib.request.urlopen(req, timeout=40).read()
+        # curl rather than urllib: python.org builds of Python often have no
+        # certificate bundle configured, and curl uses the system's.
+        data = subprocess.run(['curl', '-sfL', '-m', '40', '-A', UA, url], capture_output=True, check=True).stdout
         im = Image.open(io.BytesIO(data)).convert('RGB')
         # Crop to 16:9 from the centre, as the app does.
         w, h = im.size

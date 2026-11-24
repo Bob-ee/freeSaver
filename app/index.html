@@ -32,6 +32,23 @@
     <div id="menuHint">OK to change &nbsp;&middot;&nbsp; Back to close</div>
   </div>
 
+  <div id="pair">
+    <div class="card">
+      <div class="name">Add your photos</div>
+      <div class="cols">
+        <canvas id="pairCode" width="360" height="360"></canvas>
+        <div class="how">
+          <div class="step"><b>1</b><span>Join the same Wi-Fi as this TV on your phone</span></div>
+          <div class="step"><b>2</b><span>Point the camera at the code</span></div>
+          <div class="step"><b>3</b><span>Send photos, or link a shared album</span></div>
+          <div id="pairUrl"></div>
+          <div id="pairCount"></div>
+        </div>
+      </div>
+      <div class="go">Photos go straight from your phone to this TV &nbsp;&middot;&nbsp; Back to close</div>
+    </div>
+  </div>
+
   <div id="hint">
     <div class="card">
       <div class="name">freeSaver</div>
@@ -49,6 +66,7 @@
   <script src="config.js"></script>
   <script src="local.js"></script>
   <script src="frame.js"></script>
+  <script src="qr.js"></script>
   <script src="generative.js"></script>
   <script src="app.js"></script>
 </body>

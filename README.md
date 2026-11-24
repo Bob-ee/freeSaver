@@ -20,11 +20,15 @@ No subscription, no account, no ads.
 | The Metropolitan Museum of Art | Paintings, prints, photographs | CC0 |
 | NASA | Deep sky, planets, Earth from orbit | Public domain (NASA media policy) |
 | Generative | Abstract pictures drawn on the TV, new every time | Made on your device |
-| Your photos | Anything in the `photos/` folder | Yours |
+| Your photos | Sent from your phone, or a shared album | Yours |
 
 The catalogue of works ships inside the app; the images themselves load from
-each museum's own image server. Works are filtered to fit a 16:9 screen and
-scored for brightness and colour so murky ones are left out.
+each museum's own image server. Works are filtered to fit a 16:9 screen.
+Every work was then scored for brightness and colour variety and looked at by
+eye, and the stronger ones form the default selection, **Best picks only**.
+Nothing is removed: turn that switch off in the menu to see everything,
+including old photographs, sketches and darker works. Works with violent or
+explicit subjects sit behind a separate **Mature themes** switch.
 
 ## Features
 
@@ -35,6 +39,10 @@ scored for brightness and colour so murky ones are left out.
 - A varied rotation: the same kind of picture never comes up twice in a row.
 - Everything is set on the TV with the remote: categories, sources, frame,
   "vivid only", picture interval, brightness, night dimming, titles, clock.
+- Add your own photos from your phone by scanning a code on the TV, or link
+  a shared album (Immich, Google Photos, iCloud).
+- A curated selection by default; one switch shows everything in the
+  catalogue.
 - Save favourites and play only those; thumbs-down a picture so it never
   comes back.
 - Keeps working without internet by drawing generative art.
@@ -83,9 +91,30 @@ once every 41 days with the TV online. The menu shows how long is left under
 
 ## Your own photos
 
-Put pictures in `photos/` and run `npm run deploy`. They are converted to
-JPEG (4K at most) and bundled into the app, so the TV needs nothing else.
-That folder is git-ignored.
+No computer needed. In the menu choose **Add photos from your phone**: the TV
+shows a QR code, and scanning it opens a page served by the TV itself. From
+there you can
+
+- **send photos** from your phone. They are resized on the phone and stored
+  on the TV (up to 500);
+- **link a shared album** and the TV keeps it up to date: Immich share links,
+  Google Photos shared albums, and iCloud Shared Albums with a public
+  website link;
+- delete photos and remove albums.
+
+Your phone and TV need to be on the same Wi-Fi. Photos travel straight from
+the phone to the TV; nothing is uploaded to a service of ours, and there is
+no account. The page only works while freeSaver is open on the TV, and only
+for someone holding the link in the QR code.
+
+Notes on albums: Google offers no official way to read a shared album, so
+that one reads the public album page, shows the first 300 or so photos, and
+may break if Google changes the page. iCloud support was written from the
+public shared-album format and has not yet been confirmed against a live
+album.
+
+Building it yourself, you can also put pictures in `photos/` before
+`npm run deploy` to bake them into the package.
 
 ## Settings
 

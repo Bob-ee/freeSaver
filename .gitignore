@@ -6,3 +6,6 @@ scripts/.cache/
 # Your own pictures stay on your machine.
 photos/*
 !photos/.gitkeep
+
+# Photos stored by the service when it is run off the TV for testing.
+service/data/
